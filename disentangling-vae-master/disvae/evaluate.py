@@ -5,6 +5,7 @@ from functools import reduce
 from collections import defaultdict
 import json
 from timeit import default_timer
+import matplotlib.pyplot as plt
 
 from tqdm import trange, tqdm
 import numpy as np
@@ -90,7 +91,8 @@ class Evaluator:
         if is_still_training:
             self.model.train()
 
-        self.logger.info('Finished evaluating after {:.1f} min.'.format((default_timer() - start) / 60))
+        self.logger.info('Finished evaluating after {:.1f} min.'.format(
+            (default_timer() - start) / 60))
 
         return metric, losses
 
@@ -127,10 +129,39 @@ class Evaluator:
             lat_sizes = dataloader.dataset.lat_sizes
             lat_names = dataloader.dataset.lat_names
         except AttributeError:
-            raise ValueError("Dataset needs to have known true factors of variations to compute the metric. This does not seem to be the case for {}".format(type(dataloader.__dict__["dataset"]).__name__))
+            raise ValueError("Dataset needs to have known true factors of variations to compute the metric. This does not seem to be the case for {}".format(
+                type(dataloader.__dict__["dataset"]).__name__))
 
         self.logger.info("Computing the empirical distribution q(z|x).")
-        samples_zCx, params_zCx = self._compute_q_zCx(dataloader)
+        print("dataloader", dataloader)
+        print('len(dataloader.dataset): ', len(dataloader.dataset))
+
+        def imshow(img):
+            """Function to show an image."""
+            img = img / 2 + 0.5  # unnormalize if normalization was applied during pre-processing
+            npimg = img.numpy()
+            plt.imshow(np.transpose(npimg, (1, 2, 0)))
+            plt.show()
+
+        first_index = 368640
+        second_index = 369663
+        first_photo = dataloader.dataset[first_index]
+        second_photo = dataloader.dataset[second_index]
+
+        print('top left object')
+        samples_zCx, params_zCx, first_decoder_output = self._compute_q_zCx_single(
+            dataloader, first_index)
+        imshow(first_photo[0])
+
+        imshow(first_decoder_output[0])
+
+        print('bottom right object')
+        samples_zCx, params_zCx, second_decoder_output = self._compute_q_zCx_single(
+            dataloader, second_index)
+        imshow(second_photo[0])
+        imshow(second_decoder_output[0])
+
+        # samples_zCx, params_zCx = self._compute_q_zCx(dataloader)
         len_dataset, latent_dim = samples_zCx.shape
 
         self.logger.info("Estimating the marginal entropy.")
@@ -140,21 +171,25 @@ class Evaluator:
         # conditional entropy H(z|v)
         samples_zCx = samples_zCx.view(*lat_sizes, latent_dim)
         params_zCx = tuple(p.view(*lat_sizes, latent_dim) for p in params_zCx)
-        H_zCv = self._estimate_H_zCv(samples_zCx, params_zCx, lat_sizes, lat_names)
+        H_zCv = self._estimate_H_zCv(
+            samples_zCx, params_zCx, lat_sizes, lat_names)
 
         H_z = H_z.cpu()
         H_zCv = H_zCv.cpu()
 
         # I[z_j;v_k] = E[log \sum_x q(z_j|x)p(x|v_k)] + H[z_j] = - H[z_j|v_k] + H[z_j]
         mut_info = - H_zCv + H_z
-        sorted_mut_info = torch.sort(mut_info, dim=1, descending=True)[0].clamp(min=0)
+        sorted_mut_info = torch.sort(mut_info, dim=1, descending=True)[
+            0].clamp(min=0)
 
         metric_helpers = {'marginal_entropies': H_z, 'cond_entropies': H_zCv}
-        mig = self._mutual_information_gap(sorted_mut_info, lat_sizes, storer=metric_helpers)
+        mig = self._mutual_information_gap(
+            sorted_mut_info, lat_sizes, storer=metric_helpers)
         aam = self._axis_aligned_metric(sorted_mut_info, storer=metric_helpers)
 
         metrics = {'MIG': mig.item(), 'AAM': aam.item()}
-        torch.save(metric_helpers, os.path.join(self.save_dir, METRIC_HELPERS_FILE))
+        torch.save(metric_helpers, os.path.join(
+            self.save_dir, METRIC_HELPERS_FILE))
 
         return metrics
 
@@ -182,7 +217,8 @@ class Evaluator:
 
     def _axis_aligned_metric(self, sorted_mut_info, storer=None):
         """Compute the proposed axis aligned metrics."""
-        numerator = (sorted_mut_info[:, 0] - sorted_mut_info[:, 1:].sum(dim=1)).clamp(min=0)
+        numerator = (
+            sorted_mut_info[:, 0] - sorted_mut_info[:, 1:].sum(dim=1)).clamp(min=0)
         aam_k = numerator / sorted_mut_info[:, 0]
         aam_k[torch.isnan(aam_k)] = 0
         aam = aam_k.mean()  # mean over factor of variations
@@ -192,6 +228,44 @@ class Evaluator:
             storer["aam"] = aam
 
         return aam
+
+    def _compute_q_zCx_single(self, dataloader, index):
+        """Compute q(z|x) for a single data point x at a specified index.
+
+        Parameters
+        ----------
+        dataloader: torch.utils.data.DataLoader
+            Batch data iterator.
+        index: int
+            Index of the specific data point.
+
+        Returns
+        -------
+        sample_zCx: torch.tensor
+            Tensor of shape (1, latent_dim) containing a sample of q(z|x) for
+            the data point x at the specified index.
+
+        params_zCx: tuple of torch.Tensor
+            Sufficient statistics of q(z|x) for the data point. E.g., for
+            Gaussian (mean, log_var), each of shape : (1, latent_dim).
+        """
+        x, _ = dataloader.dataset[index]  # Assuming the second element is the target/label
+        # Add batch dimension and send to device
+        x = x.unsqueeze(0).to(self.device)
+        print("breakpoint 5")
+        with torch.no_grad():
+            # Get the parameters of q(z|x) for the specified data point
+            mean, log_var = self.model.encoder(x)
+            params_zCx = (mean, log_var)
+
+            print('mean', mean)
+            print('log_var', log_var)
+            # Sample z from q(z|x)
+            sample_zCx = self.model.reparameterize(mean, log_var)
+
+            output = self.model.decoder(sample_zCx)
+
+        return sample_zCx, params_zCx, output
 
     def _compute_q_zCx(self, dataloader):
         """Compute the empiricall disitribution of q(z|x).
@@ -215,14 +289,16 @@ class Evaluator:
         latent_dim = self.model.latent_dim
         n_suff_stat = 2
 
-        q_zCx = torch.zeros(len_dataset, latent_dim, n_suff_stat, device=self.device)
+        q_zCx = torch.zeros(len_dataset, latent_dim,
+                            n_suff_stat, device=self.device)
 
         n = 0
         with torch.no_grad():
             for x, label in dataloader:
                 batch_size = x.size(0)
                 idcs = slice(n, n + batch_size)
-                q_zCx[idcs, :, 0], q_zCx[idcs, :, 1] = self.model.encoder(x.to(self.device))
+                q_zCx[idcs, :, 0], q_zCx[idcs, :,
+                                         1] = self.model.encoder(x.to(self.device))
                 n += batch_size
 
         params_zCX = q_zCx.unbind(-1)
@@ -266,12 +342,15 @@ class Evaluator:
         # sample from p(x)
         samples_x = torch.randperm(len_dataset, device=device)[:n_samples]
         # sample from p(z|x)
-        samples_zCx = samples_zCx.index_select(0, samples_x).view(latent_dim, n_samples)
+        samples_zCx = samples_zCx.index_select(
+            0, samples_x).view(latent_dim, n_samples)
 
         mini_batch_size = 10
         samples_zCx = samples_zCx.expand(len_dataset, latent_dim, n_samples)
-        mean = params_zCX[0].unsqueeze(-1).expand(len_dataset, latent_dim, n_samples)
-        log_var = params_zCX[1].unsqueeze(-1).expand(len_dataset, latent_dim, n_samples)
+        mean = params_zCX[0].unsqueeze(-1).expand(len_dataset,
+                                                  latent_dim, n_samples)
+        log_var = params_zCX[1].unsqueeze(-1).expand(len_dataset,
+                                                     latent_dim, n_samples)
         log_N = math.log(len_dataset)
         with trange(n_samples, leave=False, disable=self.is_progress_bar) as t:
             for k in range(0, n_samples, mini_batch_size):
@@ -285,7 +364,8 @@ class Evaluator:
                 # As we don't know q(z) we appoximate it with the monte carlo
                 # expectation of q(z_j|x_n) over x. => fix a single z and look at
                 # proba for every x to generate it. n_samples is not used here !
-                log_q_z = -log_N + torch.logsumexp(log_q_zCx, dim=0, keepdim=False)
+                log_q_z = -log_N + \
+                    torch.logsumexp(log_q_zCx, dim=0, keepdim=False)
                 # H(z_j) = E_{z_j}[- log q(z_j)]
                 # mean over n_samples (i.e. dimesnion 1 because already summed over 0).
                 H_z += (-log_q_z).sum(1)
@@ -304,7 +384,8 @@ class Evaluator:
         for i_fac_var, (lat_size, lat_name) in enumerate(zip(lat_sizes, lat_names)):
             idcs = [slice(None)] * len(lat_sizes)
             for i in range(lat_size):
-                self.logger.info("Estimating conditional entropies for the {}th value of {}.".format(i, lat_name))
+                self.logger.info(
+                    "Estimating conditional entropies for the {}th value of {}.".format(i, lat_name))
                 idcs[i_fac_var] = i
                 # samples from q(z,x|v)
                 samples_zxCv = samples_zCx[idcs].contiguous().view(len_dataset // lat_size,
