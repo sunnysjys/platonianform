@@ -14,10 +14,12 @@ from utils.datasets import get_dataloaders, get_img_size, DATASETS
 from utils.helpers import (create_safe_directory, get_device, set_seed, get_n_param,
                            get_config_section, update_namespace_, FormatterNoDuplicate)
 from utils.visualize import GifTraversalsTraining
+from plot_latent_space import LatentSpacePlotter
 
-
-CONFIG_FILE = "disentangling-vae-master/hyperparam.ini"
-RES_DIR = "disentangling-vae-master/results"
+CONFIG_FILE = "hyperparam.ini"
+RES_DIR = "results"
+# CONFIG_FILE = "disentangling-vae-master/hyperparam.ini"
+# RES_DIR = "disentangling-vae-master/results"
 LOG_LEVELS = list(logging._levelToName.values())
 ADDITIONAL_EXP = ['custom', "debug", "best_celeba", "best_dsprites"]
 EXPERIMENTS = ADDITIONAL_EXP + ["{}_{}".format(loss, data)
@@ -147,13 +149,16 @@ def parse_arguments(args_to_parse):
         if args.experiment not in ADDITIONAL_EXP:
             # update all common sections first
             model, dataset = args.experiment.split("_")
-            common_data = get_config_section([CONFIG_FILE], "Common_{}".format(dataset))
+            common_data = get_config_section(
+                [CONFIG_FILE], "Common_{}".format(dataset))
             update_namespace_(args, common_data)
-            common_model = get_config_section([CONFIG_FILE], "Common_{}".format(model))
+            common_model = get_config_section(
+                [CONFIG_FILE], "Common_{}".format(model))
             update_namespace_(args, common_model)
 
         try:
-            experiments_config = get_config_section([CONFIG_FILE], args.experiment)
+            experiments_config = get_config_section(
+                [CONFIG_FILE], args.experiment)
             update_namespace_(args, experiments_config)
         except KeyError as e:
             if args.experiment in ADDITIONAL_EXP:
@@ -182,14 +187,16 @@ def main(args):
     set_seed(args.seed)
     device = get_device(is_gpu=not args.no_cuda)
     exp_dir = os.path.join(RES_DIR, args.name)
-    logger.info("Root directory for saving and loading experiments: {}".format(exp_dir))
+    logger.info(
+        "Root directory for saving and loading experiments: {}".format(exp_dir))
 
     if not args.is_eval_only:
 
         create_safe_directory(exp_dir, logger=logger)
 
         if args.loss == "factor":
-            logger.info("FactorVae needs 2 batches per iteration. To replicate this behavior while being consistent, we double the batch size and the the number of epochs.")
+            logger.info(
+                "FactorVae needs 2 batches per iteration. To replicate this behavior while being consistent, we double the batch size and the the number of epochs.")
             args.batch_size *= 2
             args.epochs *= 2
 
@@ -197,11 +204,13 @@ def main(args):
         train_loader = get_dataloaders(args.dataset,
                                        batch_size=args.batch_size,
                                        logger=logger)
-        logger.info("Train {} with {} samples".format(args.dataset, len(train_loader.dataset)))
+        logger.info("Train {} with {} samples".format(
+            args.dataset, len(train_loader.dataset)))
 
         # PREPARES MODEL
         args.img_size = get_img_size(args.dataset)  # stores for metadata
-        model = init_specific_model(args.model_type, args.img_size, args.latent_dim)
+        model = init_specific_model(
+            args.model_type, args.img_size, args.latent_dim)
         logger.info('Num parameters in model: {}'.format(get_n_param(model)))
 
         # TRAINS
@@ -227,6 +236,7 @@ def main(args):
         save_model(trainer.model, exp_dir, metadata=vars(args))
 
     if args.is_metrics or not args.no_test:
+        print("Loading model from {}".format(exp_dir))
         model = load_model(exp_dir, is_gpu=not args.no_cuda)
         metadata = load_metadata(exp_dir)
         # TO-DO: currently uses train datatset
@@ -243,8 +253,10 @@ def main(args):
                               logger=logger,
                               save_dir=exp_dir,
                               is_progress_bar=not args.no_progress_bar)
-
-        evaluator(test_loader, is_metrics=args.is_metrics, is_losses=not args.no_test)
+        helper = LatentSpacePlotter(
+            model, dataloader=test_loader, device=device)
+        helper.plot_latent_space_helper()
+        # evaluator(test_loader, is_metrics=args.is_metrics, is_losses=not args.no_test)
 
 
 if __name__ == '__main__':
