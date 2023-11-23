@@ -23,7 +23,6 @@ class LatentSpacePlotter:
         x, _ = dataloader.dataset[index]
         # Add batch dimension and send to device
         x = x.unsqueeze(0).to(self.device)
-        print("breakpoint 5")
         with torch.no_grad():
             # Get the parameters of q(z|x) for the specified data point
             mean, log_var = self.model.encoder(x)
@@ -72,12 +71,78 @@ class LatentSpacePlotter:
 
         return [0, shape, size, 0, x_coord, y_coord]
 
+    def vary_top_bottom_y_for_all_x(self):
+        list_of_idx = []
+        list_latent = []
+        for x in range(32):
+            for y in [0., 31.]:
+                latent_behavior = [0., 1., 3., 0., x, y]
+                list_of_idx.append(self.latent_to_index(latent_behavior))
+                list_latent.append(latent_behavior)
+        return list_of_idx, list_latent
+
+    def plot_difference_latent_space_top_bottom_y(self, list_of_idx, list_latent, list_mean, list_std):
+        class_info = list_latent[:, -1]
+        print("class_info", class_info)
+        print("list_mean", list_mean.shape)
+
+        means_class_0 = list_mean[class_info == 0, :]
+        means_class_31 = list_mean[class_info == 31, :]
+
+        std_class_0 = list_std[class_info == 0, :]
+        std_class_31 = list_std[class_info == 31, :]
+
+        print("means_class_0", means_class_0.shape)
+        print("means_class_31", means_class_31.shape)
+
+        for i in range(10):
+            x_values_class_0 = np.full(means_class_0.shape[0], i) - 0.1
+            x_values_class_31 = np.full(means_class_31.shape[0], i) + 0.1
+
+            plt.scatter(
+                x_values_class_0, means_class_0[:, i], color='red', label='Y=0' if i == 0 else "")
+            plt.scatter(
+                x_values_class_31, means_class_31[:, i], color='blue', label='Y=31' if i == 0 else "")
+
+        plt.title(
+            'Comparison of Means across all 10 latent dimensions for y=0 and y=31')
+        plt.xlabel('Dimension')
+        plt.ylabel('Mean Value')
+        # Set x-axis labels for dimensions
+        plt.xticks(range(10), [f'Dim {i+1}' for i in range(10)])
+        plt.legend()
+        plt.show()
+
+        for i in range(10):
+            x_values_class_0 = np.full(std_class_0.shape[0], i) - 0.1
+            x_values_class_31 = np.full(std_class_31.shape[0], i) + 0.1
+
+            plt.scatter(
+                x_values_class_0, std_class_0[:, i], color='red', label='Y=0' if i == 0 else "")
+            plt.scatter(
+                x_values_class_31, std_class_31[:, i], color='blue', label='Y=31' if i == 0 else "")
+
+        plt.title(
+            'Comparison of Standard Deviation across all 10 latent dimensions for y=0 and y=31')
+        plt.xlabel('Dimension')
+        plt.ylabel('Standard Deviation Value')
+        # Set x-axis labels for dimensions
+        plt.xticks(range(10), [f'Dim {i+1}' for i in range(10)])
+        plt.legend()
+        plt.show()
+
     def plot_latent_space_helper(self):
-        print("breakpoint 2")
 
         list_of_idx = []
         list_latent = []
+        list_mean = []
+        list_std = []
         while True:
+            automatic_choice = input(
+                "Do you want to vary the top and bottom y space for all x, for the shape ellipse, rotation 0, and size 3?").strip().upper()
+            if automatic_choice == 'Y':
+                list_of_idx, list_latent = self.vary_top_bottom_y_for_all_x()
+                break
             latent_behavior = self.ask_user_input()
             list_latent.append(latent_behavior)
             list_of_idx.append(self.latent_to_index(latent_behavior))
@@ -92,8 +157,17 @@ class LatentSpacePlotter:
 
             samples_zCx, params_zCx, decoder_output, mean, std = self._compute_q_zCx_single(
                 self.dataloader, list_of_idx[i])
+            mean = np.array(mean[0])
+            std = np.array(std[0])
             print("mean", mean)
             print("std", std)
-            print("*"*50)
-            self.imshow(photo[0])
-            self.imshow(decoder_output[0])
+            list_mean.append(mean)
+            list_std.append(std)
+
+        list_idx = np.array(list_of_idx)
+        list_latent = np.array(list_latent)
+        list_mean = np.array(list_mean)
+        list_std = np.array(list_std)
+
+        self.plot_difference_latent_space_top_bottom_y(
+            list_of_idx, list_latent, list_mean, list_std)
