@@ -255,7 +255,7 @@ def main(args):
                               is_progress_bar=not args.no_progress_bar)
         helper = LatentSpacePlotter(
             model, dataloader=test_loader, device=device)
-        helper.plot_latent_space_helper()
+        helper.main_experiment()
         # evaluator(test_loader, is_metrics=args.is_metrics, is_losses=not args.no_test)
 
 

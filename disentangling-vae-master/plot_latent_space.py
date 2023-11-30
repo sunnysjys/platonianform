@@ -71,7 +71,7 @@ class LatentSpacePlotter:
 
         return [0, shape, size, 0, x_coord, y_coord]
 
-    def vary_top_bottom_y_for_all_x(self):
+    def experiment_one_vary_top_bottom_y_for_all_x(self):
         list_of_idx = []
         list_latent = []
         for x in range(32):
@@ -81,7 +81,16 @@ class LatentSpacePlotter:
                 list_latent.append(latent_behavior)
         return list_of_idx, list_latent
 
-    def plot_difference_latent_space_top_bottom_y(self, list_of_idx, list_latent, list_mean, list_std):
+    def experiment_two_hold_x_constant_incremently_increase_y(self, constant_x_value=0):
+        list_of_idx = []
+        list_latent = []
+        for y in range(32):
+            latent_behavior = [0., 1., 3., 0., constant_x_value, y]
+            list_of_idx.append(self.latent_to_index(latent_behavior))
+            list_latent.append(latent_behavior)
+        return list_of_idx, list_latent
+
+    def experiement_one_plot_helper(self, list_of_idx, list_latent, list_mean, list_std):
         class_info = list_latent[:, -1]
         print("class_info", class_info)
         print("list_mean", list_mean.shape)
@@ -95,6 +104,61 @@ class LatentSpacePlotter:
         print("means_class_0", means_class_0.shape)
         print("means_class_31", means_class_31.shape)
 
+        self.experiment_one_plot_all_data_latent(
+            means_class_0, means_class_31, std_class_0, std_class_31)
+        self.experiment_one_plot_subtraction_per_data_point(
+            means_class_0, means_class_31, std_class_0, std_class_31)
+
+    def experiment_two_plot_helper(self, list_of_idx, list_latent, list_mean, list_std):
+        # list_mean, list_std, is going to contain all of the means and std
+        # when we hold x to be constant, and then incremently increase y from 0 to 31, in that order
+
+        class_info = list_latent[:, -1]
+        print("class_info", class_info)
+        assert all(class_info[i] <= class_info[i+1]
+                   for i in range(len(class_info)-1)), "List is not in ascending order"
+
+        print("list_mean", list_mean.shape)
+
+        self.experiment_two_plot_all_data_latent(
+            list_of_idx, list_latent, list_mean, list_std)
+
+    def experiment_one_plot_subtraction_per_data_point(self, means_class_0, means_class_31, std_class_0, std_class_31):
+        # This function is going to plot the subtracted difference, per each specific x, the difference in means and standard deviations for y = 0 and y = 31
+        assert means_class_0.shape == means_class_31.shape
+        assert std_class_0.shape == std_class_31.shape
+
+        for i in range(10):
+            x_values = np.full(means_class_0.shape[0], i)
+
+            plt.scatter(
+                x_values, means_class_31[:, i] - means_class_0[:, i], color='blue', label='Difference in Means' if i == 0 else "")
+
+        plt.title(
+            f'Difference in Means for y=0 and y=31 across all x simultaneously for all 10 latent dimensions, N = {means_class_0.shape[0]}')
+        plt.xlabel('Dimension')
+        plt.ylabel('Difference in Mean Value')
+        # Set x-axis labels for dimensions
+        plt.xticks(range(10), [f'Dim {i+1}' for i in range(10)])
+        plt.legend()
+        plt.show()
+
+        for i in range(10):
+            x_values = np.full(std_class_0.shape[0], i)
+            plt.scatter(
+                x_values, std_class_31[:, i] - std_class_0[:, i], color='blue', label='Difference in Standard Deviations' if i == 0 else "")
+        plt.title(
+            f'Difference in STD for y=0 and y=31 across all x simultaneously for all 10 latent dimensions, N = {means_class_0.shape[0]}')
+
+        plt.xlabel('Dimension')
+        plt.ylabel('Difference in Standard Deviation Value')
+        # Set x-axis labels for dimensions
+        plt.xticks(range(10), [f'Dim {i+1}' for i in range(10)])
+        plt.legend()
+        plt.show()
+
+    def experiment_one_plot_all_data_latent(self, means_class_0, means_class_31, std_class_0, std_class_31):
+        # This function simply plots the means and standard deviations for all 10 latent dimensions for all 32 x values
         for i in range(10):
             x_values_class_0 = np.full(means_class_0.shape[0], i) - 0.1
             x_values_class_31 = np.full(means_class_31.shape[0], i) + 0.1
@@ -105,7 +169,7 @@ class LatentSpacePlotter:
                 x_values_class_31, means_class_31[:, i], color='blue', label='Y=31' if i == 0 else "")
 
         plt.title(
-            'Comparison of Means across all 10 latent dimensions for y=0 and y=31')
+            f'Comparison of for y=0 and y=31 across all x simultaneously for all 10 latent dimensions, N = {x_values_class_0.shape[0] + x_values_class_31.shape[0]}')
         plt.xlabel('Dimension')
         plt.ylabel('Mean Value')
         # Set x-axis labels for dimensions
@@ -123,7 +187,7 @@ class LatentSpacePlotter:
                 x_values_class_31, std_class_31[:, i], color='blue', label='Y=31' if i == 0 else "")
 
         plt.title(
-            'Comparison of Standard Deviation across all 10 latent dimensions for y=0 and y=31')
+            f'Comparison of STD for y=0 and y=31 across all x simultaneously for all 10 latent dimensions, N = {x_values_class_0.shape[0] + x_values_class_31.shape[0]}')
         plt.xlabel('Dimension')
         plt.ylabel('Standard Deviation Value')
         # Set x-axis labels for dimensions
@@ -131,18 +195,65 @@ class LatentSpacePlotter:
         plt.legend()
         plt.show()
 
-    def plot_latent_space_helper(self):
+    def experiment_two_plot_all_data_latent(self, list_of_idx, list_latent, list_mean, list_std):
+        num_dimensions = list_mean.shape[1]
+        y_values = np.arange(32)  # Assuming y values range from 0 to 31
+        # Light to dark blue colors
+        colors = plt.cm.Blues(np.linspace(0.2, 1, 32))
+
+        plt.figure(figsize=(12, 6))
+        for dim in range(num_dimensions):
+            for y in range(32):
+                # Plot mean for each y
+                # print("current list_mean", list_mean[y, dim])
+                plt.plot(dim, list_mean[y, dim], 'o', color=colors[y], label=f'y={y}' if y in [
+                         0, 31] and dim == 0 else "")
+                # Plot std dev for each y
+                # plt.fill_between(list_of_idx, list_mean[dim, y] - list_std[dim, y],
+                #  list_mean[dim, y] + list_std[dim, y], color=colors[y], alpha=0.1)
+
+        plt.title(
+            f'For X = {int(list_latent[0,-2])}, Y varys from Y=0 to Y=31 for all 10 dimensions, N = {list_mean.shape[0]}')
+        plt.xlabel('Dimension Index')
+        plt.ylabel('Value (Mean)')
+        plt.legend()
+        plt.show()
+
+    def main_experiment(self):
 
         list_of_idx = []
         list_latent = []
         list_mean = []
         list_std = []
+
+        running_experiment = False
         while True:
+            prompt = " Enter the experiment number, else enter N \n" + \
+                "(Experiment 1): Incremently increase the x from 0 to 31, while measuring the difference between the \n" +  \
+                "latent dimensions for each x when y = 0 v.s. y = 31 for the shape ellipse, rotation 0, and size 3?\n" + \
+                "(Experiment 2): Hold X to be constant at 0, and incremently increase the y from 0 to 31, while visualizing the difference in latent space, for the shape ellipse, rotation 0, and size 3 \n" + \
+                "Experiment Number: "
+
             automatic_choice = input(
-                "Do you want to vary the top and bottom y space for all x, for the shape ellipse, rotation 0, and size 3?").strip().upper()
-            if automatic_choice == 'Y':
-                list_of_idx, list_latent = self.vary_top_bottom_y_for_all_x()
+                prompt).strip().upper()
+            if automatic_choice == '1':
+                list_of_idx, list_latent = self.experiment_one_vary_top_bottom_y_for_all_x()
+                running_experiment = 1
                 break
+            elif automatic_choice == '2':
+                prompt = "What value do you want to hold X to be constant at? "
+                try:
+                    x_value = int(input(
+                        prompt).strip().upper())
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
+                    continue
+
+                list_of_idx, list_latent = self.experiment_two_hold_x_constant_incremently_increase_y(
+                    x_value)
+                running_experiment = 2
+                break
+
             latent_behavior = self.ask_user_input()
             list_latent.append(latent_behavior)
             list_of_idx.append(self.latent_to_index(latent_behavior))
@@ -169,5 +280,9 @@ class LatentSpacePlotter:
         list_mean = np.array(list_mean)
         list_std = np.array(list_std)
 
-        self.plot_difference_latent_space_top_bottom_y(
-            list_of_idx, list_latent, list_mean, list_std)
+        if running_experiment == 1:
+            self.experiement_one_plot_helper(
+                list_idx, list_latent, list_mean, list_std)
+        elif running_experiment == 2:
+            self.experiment_two_plot_helper(
+                list_idx, list_latent, list_mean, list_std)
