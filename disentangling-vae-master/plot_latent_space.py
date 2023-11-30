@@ -2,6 +2,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 import torch
 import argparse
+from scipy.stats import norm
 
 
 class LatentSpacePlotter:
@@ -122,6 +123,8 @@ class LatentSpacePlotter:
 
         self.experiment_two_plot_all_data_latent(
             list_of_idx, list_latent, list_mean, list_std)
+        self.experiment_two_plot_gaussian_latent(
+            list_of_idx, list_latent, list_mean, list_std)
 
     def experiment_one_plot_subtraction_per_data_point(self, means_class_0, means_class_31, std_class_0, std_class_31):
         # This function is going to plot the subtracted difference, per each specific x, the difference in means and standard deviations for y = 0 and y = 31
@@ -197,26 +200,80 @@ class LatentSpacePlotter:
 
     def experiment_two_plot_all_data_latent(self, list_of_idx, list_latent, list_mean, list_std):
         num_dimensions = list_mean.shape[1]
-        y_values = np.arange(32)  # Assuming y values range from 0 to 31
+        y_values = list_mean.shape[0]  # Assuming y values range from 0 to 31
+
+        assert y_values == 32, "Y values should be 32"
+        assert num_dimensions == 10, "Number of dimensions should be 10"
+
         # Light to dark blue colors
         colors = plt.cm.Blues(np.linspace(0.2, 1, 32))
 
-        plt.figure(figsize=(12, 6))
+        # Create a figure with two subplots
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10))
+
+        # Plot for Mean
+        ax1.set_title(
+            f'For X = {int(list_latent[0,-2])}, Y varies from Y=0 to Y=31 for Mean')
+        ax1.set_xlabel('Dimension Index')
+        ax1.set_ylabel('Value (Mean)')
         for dim in range(num_dimensions):
             for y in range(32):
-                # Plot mean for each y
-                # print("current list_mean", list_mean[y, dim])
-                plt.plot(dim, list_mean[y, dim], 'o', color=colors[y], label=f'y={y}' if y in [
+                ax1.plot(dim, list_mean[y, dim], 'o', color=colors[y], label=f'y={y}' if y in [
                          0, 31] and dim == 0 else "")
-                # Plot std dev for each y
-                # plt.fill_between(list_of_idx, list_mean[dim, y] - list_std[dim, y],
-                #  list_mean[dim, y] + list_std[dim, y], color=colors[y], alpha=0.1)
 
-        plt.title(
-            f'For X = {int(list_latent[0,-2])}, Y varys from Y=0 to Y=31 for all 10 dimensions, N = {list_mean.shape[0]}')
-        plt.xlabel('Dimension Index')
-        plt.ylabel('Value (Mean)')
-        plt.legend()
+        # Plot for Standard Deviation
+        ax2.set_title(
+            f'For X = {int(list_latent[0,-2])}, Y varies from Y=0 to Y=31 for STD')
+        ax2.set_xlabel('Dimension Index')
+        ax2.set_ylabel('Value (STD)')
+        for dim in range(num_dimensions):
+            for y in range(32):
+                ax2.plot(dim, list_std[y, dim], 'o', color=colors[y], label=f'y={y}' if y in [
+                         0, 31] and dim == 0 else "")
+
+        # Adjust the layout and show the plot
+        fig.suptitle('Ellipse, size 3, rotation 0')
+        plt.tight_layout()
+        plt.show()
+
+    def experiment_two_plot_gaussian_latent(self, list_of_idx, list_latent, list_mean, list_std):
+        num_dimensions = list_mean.shape[1]
+        y_values = list_mean.shape[0]  # Assuming y values range from 0 to 31
+
+        assert y_values == 32, "Y values should be 32"
+        assert num_dimensions == 10, "Number of dimensions should be 10"
+
+        # Light to dark blue colors
+        colors = plt.cm.Blues(np.linspace(0.2, 1, 32))
+
+        # X range for plotting Gaussian curves
+        x_range = np.linspace(-3, 3, 1000)
+
+        # Create a figure with one subplot per dimension
+        fig, axes = plt.subplots(
+            num_dimensions, 1, figsize=(10, 1.15 * num_dimensions))
+
+        # Check if there is only one dimension (axes won't be an array in this case)
+        if num_dimensions == 1:
+            axes = [axes]
+
+        for dim in range(num_dimensions):
+            ax = axes[dim]
+            ax.set_title(f'Gaussian Curves for Dimension {dim}')
+            ax.set_xlabel('Value')
+            ax.set_ylabel('Probability Density')
+
+            for y in range(32):
+
+                mu = list_mean[y, dim]
+                sigma = list_std[y, dim]
+                ax.plot(x_range, norm.pdf(x_range, mu, sigma),
+                        color=colors[y], label=f'y={y}' if y in [0, 31] else "")
+
+            if dim == 0:
+                ax.legend()
+        fig.suptitle(f'Ellipse, size 3, rotation 0, x = {list_latent[0,-2]}')
+        plt.tight_layout()
         plt.show()
 
     def main_experiment(self):
@@ -266,12 +323,12 @@ class LatentSpacePlotter:
             print("for idx", list_of_idx[i], "for user input", list_latent[i])
             photo = self.dataloader.dataset[list_of_idx[i]]
 
-            samples_zCx, params_zCx, decoder_output, mean, std = self._compute_q_zCx_single(
+            samples_zCx, params_zCx, decoder_output, mean, log_var = self._compute_q_zCx_single(
                 self.dataloader, list_of_idx[i])
+
+            std = np.array(np.sqrt(np.exp(log_var[0])))
             mean = np.array(mean[0])
-            std = np.array(std[0])
-            print("mean", mean)
-            print("std", std)
+
             list_mean.append(mean)
             list_std.append(std)
 
