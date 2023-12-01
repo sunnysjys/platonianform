@@ -68,17 +68,25 @@ class DecoderBurgess(nn.Module):
         batch_size = z.size(0)
 
         # Fully connected layers with ReLu activations
-        x = torch.relu(self.lin1(z))
-        x = torch.relu(self.lin2(x))
-        x = torch.relu(self.lin3(x))
-        x = x.view(batch_size, *self.reshape)
+        lin1_output = torch.relu(self.lin1(z))
+        lin2_output = torch.relu(self.lin2(lin1_output))
+        lin3_output = torch.relu(self.lin3(lin2_output))
+        x = lin3_output.view(batch_size, *self.reshape)
 
         # Convolutional layers with ReLu activations
         if self.img_size[1] == self.img_size[2] == 64:
             x = torch.relu(self.convT_64(x))
-        x = torch.relu(self.convT1(x))
-        x = torch.relu(self.convT2(x))
+        convt1_output = torch.relu(self.convT1(x))
+        convt2_output = torch.relu(self.convT2(convt1_output))
         # Sigmoid activation for final conv layer
-        x = torch.sigmoid(self.convT3(x))
+        convt3_output = self.convT3(convt2_output)
+        x = torch.sigmoid(convt3_output)
 
-        return x
+        # Save the weights of the decoder
+        convt1_weight = self.convT1.weight.data
+        convt2_weight = self.convT2.weight.data
+        convt3_weight = self.convT3.weight.data
+
+        # Last_layer_output is the output before activation
+        return x, (lin1_output, lin2_output, lin3_output), \
+            (convt1_output, convt2_output, convt3_output), (convt1_weight, convt2_weight, convt3_weight)

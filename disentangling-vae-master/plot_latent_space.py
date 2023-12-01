@@ -2,6 +2,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 import torch
 import argparse
+import seaborn as sns
 from scipy.stats import norm
 
 
@@ -12,7 +13,7 @@ class LatentSpacePlotter:
         self.device = device
 
         dataset_zip = np.load(
-            '../dsprites/dsprites_ndarray_co1sh3sc6or40x32y32_64x64.npz', allow_pickle=True, encoding='latin1')
+            'dsprites/dsprites_ndarray_co1sh3sc6or40x32y32_64x64.npz', allow_pickle=True, encoding='latin1')
         self.metadata = dataset_zip['metadata'][()]
         self.latents_bases = np.concatenate((self.metadata["latents_sizes"][::-1].cumprod()[::-1][1:],
                                              np.array([1,])))
@@ -32,9 +33,9 @@ class LatentSpacePlotter:
             # Sample z from q(z|x)
             sample_zCx = self.model.reparameterize(mean, log_var)
 
-            output = self.model.decoder(sample_zCx)
+            output, lin_outputs, conv_outputs, conv_weights_tuple = self.model.decoder(sample_zCx)
 
-        return sample_zCx, params_zCx, output, mean, log_var
+        return sample_zCx, params_zCx, output, mean, log_var, lin_outputs, conv_outputs, conv_weights_tuple
 
     def imshow(self, img):
         """Function to show an image."""
