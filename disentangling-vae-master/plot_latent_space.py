@@ -91,6 +91,15 @@ class LatentSpacePlotter:
             list_latent.append(latent_behavior)
         return list_of_idx, list_latent
 
+    def experiment_three_hold_x_constant_incremently_increase_y(self, constant_x_value=0, shape=0):
+        list_of_idx = []
+        list_latent = []
+        for y in range(32):
+            latent_behavior = [0., shape, 3., 0., constant_x_value, y]
+            list_of_idx.append(self.latent_to_index(latent_behavior))
+            list_latent.append(latent_behavior)
+        return list_of_idx, list_latent
+
     def experiement_one_plot_helper(self, list_of_idx, list_latent, list_mean, list_std):
         class_info = list_latent[:, -1]
         print("class_info", class_info)
@@ -125,6 +134,14 @@ class LatentSpacePlotter:
             list_of_idx, list_latent, list_mean, list_std)
         self.experiment_two_plot_gaussian_latent(
             list_of_idx, list_latent, list_mean, list_std)
+
+    def experiment_three_plot_helper(self, list_of_idx, list_latent, list_mean, list_std):
+        self.experiment_three_plot_all_data_latent(
+            list_of_idx, list_latent, list_mean, list_std
+        )
+        self.experiment_three_plot_gaussian_latent(
+            list_of_idx, list_latent, list_mean, list_std
+        )
 
     def experiment_one_plot_subtraction_per_data_point(self, means_class_0, means_class_31, std_class_0, std_class_31):
         # This function is going to plot the subtracted difference, per each specific x, the difference in means and standard deviations for y = 0 and y = 31
@@ -276,6 +293,92 @@ class LatentSpacePlotter:
         plt.tight_layout()
         plt.show()
 
+    def experiment_three_plot_all_data_latent(self, list_of_idx, list_latent, list_mean, list_std):
+        num_dimensions = list_mean.shape[1]
+        y_values = 32
+
+        # grab total different x_Values entered
+        num_x_values_entered = len(list_latent) // y_values
+
+        for x_value in range(num_x_values_entered):
+            cur_x_index = 32*x_value
+            # Light to dark blue colors
+            colors = plt.cm.Blues(np.linspace(0.2, 1, 32))
+
+            # Create a figure with two subplots
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10))
+
+            # Plot for Mean
+            ax1.set_title(
+                f'For X = {int(list_latent[cur_x_index,-2])}, Y varies from Y=0 to Y=31 for Mean')
+            ax1.set_xlabel('Dimension Index')
+            ax1.set_ylabel('Value (Mean)')
+            for dim in range(num_dimensions):
+                for y in range(32):
+                    ax1.plot(dim, list_mean[cur_x_index + y, dim], 'o', color=colors[y], label=f'y={y}' if y in [
+                        0, 31] and dim == 0 else "")
+
+            # Plot for Standard Deviation
+            ax2.set_title(
+                f'For X = {int(list_latent[cur_x_index,-2])}, Y varies from Y=0 to Y=31 for STD')
+            ax2.set_xlabel('Dimension Index')
+            ax2.set_ylabel('Value (STD)')
+
+            for dim in range(num_dimensions):
+                for y in range(32):
+                    ax2.plot(dim, list_std[cur_x_index + y, dim], 'o', color=colors[y], label=f'y={y}' if y in [
+                        0, 31] and dim == 0 else "")
+
+            # Adjust the layout and show the plot
+            fig.suptitle(f'Shape={int(list_latent[0][1])}, size 3, rotation 0')
+
+            plt.tight_layout()
+            file_path = f"../Experimental_Results/experiment_three/shape_{int(list_latent[0][1])}/x_{int(list_latent[cur_x_index,-2])}.png"
+            plt.savefig(file_path)
+
+    def experiment_three_plot_gaussian_latent(self, list_of_idx, list_latent, list_mean, list_std):
+        num_dimensions = list_mean.shape[1]
+        y_values = 32
+
+        # grab total different x_Values entered
+        num_x_values_entered = len(list_latent) // y_values
+
+        for x_value in range(num_x_values_entered):
+
+            cur_x_index = 32*x_value
+            colors = plt.cm.Blues(np.linspace(0.2, 1, 32))
+            # X range for plotting Gaussian curves
+            x_range = np.linspace(-3, 3, 1000)
+
+            # Create a figure with one subplot per dimension
+            fig, axes = plt.subplots(
+                num_dimensions, 1, figsize=(10, 1.15 * num_dimensions))
+
+            # Check if there is only one dimension (axes won't be an array in this case)
+            if num_dimensions == 1:
+                axes = [axes]
+
+            for dim in range(num_dimensions):
+                ax = axes[dim]
+                ax.set_title(f'Gaussian Curves for Dimension {dim}')
+                ax.set_xlabel('Value')
+                ax.set_ylabel('Probability Density')
+
+                for y in range(32):
+
+                    mu = list_mean[cur_x_index + y, dim]
+                    sigma = list_std[cur_x_index + y, dim]
+                    ax.plot(x_range, norm.pdf(x_range, mu, sigma),
+                            color=colors[y], label=f'y={y}' if y in [0, 31] else "")
+
+                if dim == 0:
+                    ax.legend()
+            fig.suptitle(
+                f'Shape = {int(list_latent[0][1])}, size 3, rotation 0, x = {int(list_latent[cur_x_index,-2])}')
+            plt.tight_layout()
+            file_path = f"../Experimental_Results/experiment_three/shape_{int(list_latent[0][1])}/x_{int(list_latent[cur_x_index,-2])}_g.png"
+            plt.savefig(file_path)
+
     def main_experiment(self):
 
         list_of_idx = []
@@ -289,7 +392,8 @@ class LatentSpacePlotter:
                 "(Experiment 1): Incremently increase the x from 0 to 31, while measuring the difference between the \n" +  \
                 "latent dimensions for each x when y = 0 v.s. y = 31 for the shape ellipse, rotation 0, and size 3?\n" + \
                 "(Experiment 2): Hold X to be constant at 0, and incremently increase the y from 0 to 31, while visualizing the difference in latent space, for the shape ellipse, rotation 0, and size 3 \n" + \
-                "Experiment Number: "
+                "(Experiment 3): Repetition of Experiment 2, except you can control shape, and input multiple possible X" +\
+                "Experiment Number (ENTER): "
 
             automatic_choice = input(
                 prompt).strip().upper()
@@ -298,7 +402,7 @@ class LatentSpacePlotter:
                 running_experiment = 1
                 break
             elif automatic_choice == '2':
-                prompt = "What value do you want to hold X to be constant at? "
+                prompt = "What value do you want to hold X to be constant at? \n (ENTER):"
                 try:
                     x_value = int(input(
                         prompt).strip().upper())
@@ -309,6 +413,29 @@ class LatentSpacePlotter:
                 list_of_idx, list_latent = self.experiment_two_hold_x_constant_incremently_increase_y(
                     x_value)
                 running_experiment = 2
+                break
+            elif automatic_choice == '3':
+                prompt = "What values of X do you want to hold it to be constant at? Please enter them separated by a comma \n (ENTER): "
+                try:
+                    x_values = input(prompt).strip()
+                    x_values = list(map(int, x_values.split(',')))
+                except ValueError:
+                    print("Invalid input. Please enter numbers separated by a comma.")
+
+                prompt = "What shape do you want to choose? Enter 0 for square, 1 for ellipse, 2 for heart: \n (ENTER): "
+                try:
+                    shape = int(input(prompt).strip())
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
+
+                list_of_idx = []
+                list_latent = []
+                for x_value in x_values:
+                    cur_list_of_idx, cur_list_latent = self.experiment_three_hold_x_constant_incremently_increase_y(
+                        x_value, shape)
+                    list_of_idx.extend(cur_list_of_idx)
+                    list_latent.extend(cur_list_latent)
+                running_experiment = 3
                 break
 
             latent_behavior = self.ask_user_input()
@@ -342,4 +469,7 @@ class LatentSpacePlotter:
                 list_idx, list_latent, list_mean, list_std)
         elif running_experiment == 2:
             self.experiment_two_plot_helper(
+                list_idx, list_latent, list_mean, list_std)
+        elif running_experiment == 3:
+            self.experiment_three_plot_helper(
                 list_idx, list_latent, list_mean, list_std)
