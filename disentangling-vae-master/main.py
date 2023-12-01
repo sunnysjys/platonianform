@@ -16,8 +16,8 @@ from utils.helpers import (create_safe_directory, get_device, set_seed, get_n_pa
 from utils.visualize import GifTraversalsTraining
 from plot_latent_space import LatentSpacePlotter
 
-CONFIG_FILE = "hyperparam.ini"
-RES_DIR = "results"
+CONFIG_FILE = "disentangling-vae-master/hyperparam.ini"
+RES_DIR = "disentangling-vae-master/results"
 # CONFIG_FILE = "disentangling-vae-master/hyperparam.ini"
 # RES_DIR = "disentangling-vae-master/results"
 LOG_LEVELS = list(logging._levelToName.values())
