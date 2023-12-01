@@ -144,6 +144,42 @@ class LatentSpacePlotter:
             list_of_idx, list_latent, list_mean, list_std
         )
 
+    def experiment_a_plot_helper(self, list_of_idx, list_latent, list_lin1_out, list_lin2_out, list_lin3_out):
+        # get the mean and std of the each neuron in each linear layer
+        lin1_means, lin1_stds, lin2_means, lin2_stds, lin3_means, lin3_stds = self.experiment_a_linear_layer_mean_std(list_lin1_out, list_lin2_out, list_lin3_out)
+        # find the neurons that fire bigger than the mean + 1 std
+        lin1_neurons_fired = self.experiment_a_find_neurons_fired(list_lin1_out, lin1_means, lin1_stds)
+        lin2_neurons_fired = self.experiment_a_find_neurons_fired(list_lin2_out, lin2_means, lin2_stds)
+        lin3_neurons_fired = self.experiment_a_find_neurons_fired(list_lin3_out, lin3_means, lin3_stds)
+        print("lin1", lin1_neurons_fired)
+        print("lin2", lin2_neurons_fired)
+        print("lin3", lin3_neurons_fired)
+        # plot the activation of neurons for each experiment and have the neuron firing in a gradient of colors
+
+    def experiment_a_find_neurons_fired(self, list_lin_out, lin_means, lin_stds):
+        # have neurons_fired in an array per experiment, (experiment_size, num_neurons_fired)
+        neurons_fired = [[] for i in range(list_lin_out.shape[0])]
+        # number of experiments
+        for i in range(list_lin_out.shape[0]):
+            # number of neurons
+            for j in range(list_lin_out.shape[2]):
+                if list_lin_out[i, :, j] > lin_means[:, j] + 2 * lin_stds[:, j]:
+                    # append the index of the neuron 
+                    neurons_fired[i].append(j)
+        return neurons_fired
+
+    def experiment_a_linear_layer_mean_std(self, 
+                                           list_lin1_out, # experiment_size, 1, 256
+                                           list_lin2_out, # experiment_size, 1, 256
+                                           list_lin3_out): # experiment_size, 1, 512
+        lin1_means = np.mean(list_lin1_out, axis=0)
+        lin1_stds = np.std(list_lin1_out, axis=0)
+        lin2_means = np.mean(list_lin2_out, axis=0)
+        lin2_stds = np.std(list_lin2_out, axis=0)
+        lin3_means = np.mean(list_lin3_out, axis=0)
+        lin3_stds = np.std(list_lin3_out, axis=0)
+        return lin1_means, lin1_stds, lin2_means, lin2_stds, lin3_means, lin3_stds
+
     def experiment_one_plot_subtraction_per_data_point(self, means_class_0, means_class_31, std_class_0, std_class_31):
         # This function is going to plot the subtracted difference, per each specific x, the difference in means and standard deviations for y = 0 and y = 31
         assert means_class_0.shape == means_class_31.shape
@@ -386,6 +422,9 @@ class LatentSpacePlotter:
         list_latent = []
         list_mean = []
         list_std = []
+        list_lin1_out = []
+        list_lin2_out = []
+        list_lin3_out = []
 
         running_experiment = False
         while True:
@@ -393,14 +432,15 @@ class LatentSpacePlotter:
                 "(Experiment 1): Incremently increase the x from 0 to 31, while measuring the difference between the \n" +  \
                 "latent dimensions for each x when y = 0 v.s. y = 31 for the shape ellipse, rotation 0, and size 3?\n" + \
                 "(Experiment 2): Hold X to be constant at 0, and incremently increase the y from 0 to 31, while visualizing the difference in latent space, for the shape ellipse, rotation 0, and size 3 \n" + \
-                "(Experiment 3): Repetition of Experiment 2, except you can control shape, and input multiple possible X" +\
+                "(Experiment 3): Repetition of Experiment 2, except you can control shape, and input multiple possible X\n" +\
+                "(Experiment a): Hold shape, scale, rotation, and x position constant, and only vary y position from 0 to 31, while measuring the mean and std of neurons in the three linear layers\n" + \
                 "Experiment Number (ENTER): "
 
             automatic_choice = input(
-                prompt).strip().upper()
+                prompt).strip()
             if automatic_choice == '1':
                 list_of_idx, list_latent = self.experiment_one_vary_top_bottom_y_for_all_x()
-                running_experiment = 1
+                running_experiment = '1'
                 break
             elif automatic_choice == '2':
                 prompt = "What value do you want to hold X to be constant at? \n (ENTER):"
@@ -413,7 +453,7 @@ class LatentSpacePlotter:
 
                 list_of_idx, list_latent = self.experiment_two_hold_x_constant_incremently_increase_y(
                     x_value)
-                running_experiment = 2
+                running_experiment = '2'
                 break
             elif automatic_choice == '3':
                 prompt = "What values of X do you want to hold it to be constant at? Please enter them separated by a comma \n (ENTER): "
@@ -436,8 +476,35 @@ class LatentSpacePlotter:
                         x_value, shape)
                     list_of_idx.extend(cur_list_of_idx)
                     list_latent.extend(cur_list_latent)
-                running_experiment = 3
+                running_experiment = '3'
                 break
+            elif automatic_choice == 'a':
+                print("experiment a ")
+                prompt = "What values of X do you want to hold it to be constant at? Please enter them separated by a comma \n (ENTER): "
+                try:
+                    x_values = input(prompt).strip()
+                    x_values = list(map(int, x_values.split(',')))
+                except ValueError:
+                    print("Invalid input. Please enter numbers separated by a comma.")
+
+                prompt = "What shape do you want to choose? Enter 0 for square, 1 for ellipse, 2 for heart: \n (ENTER): "
+                try:
+                    shape = int(input(prompt).strip())
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
+
+                list_of_idx = []
+                list_latent = []
+                for x_value in x_values:
+                    # calling other experiment's helper to get the list of idx and list of latents
+                    cur_list_of_idx, cur_list_latent = self.experiment_three_hold_x_constant_incremently_increase_y(
+                        x_value, shape)
+                    list_of_idx.extend(cur_list_of_idx)
+                    list_latent.extend(cur_list_latent)
+                running_experiment = 'a'
+                break
+
+            print("automatic choice", automatic_choice)
 
             latent_behavior = self.ask_user_input()
             list_latent.append(latent_behavior)
@@ -451,7 +518,7 @@ class LatentSpacePlotter:
             print("for idx", list_of_idx[i], "for user input", list_latent[i])
             photo = self.dataloader.dataset[list_of_idx[i]]
 
-            samples_zCx, params_zCx, decoder_output, mean, log_var = self._compute_q_zCx_single(
+            samples_zCx, params_zCx, decoder_output, mean, log_var, lin_out, conv_out, conv_weights_tuple = self._compute_q_zCx_single(
                 self.dataloader, list_of_idx[i])
 
             std = np.array(np.sqrt(np.exp(log_var[0])))
@@ -459,18 +526,27 @@ class LatentSpacePlotter:
 
             list_mean.append(mean)
             list_std.append(std)
+            list_lin1_out.append(lin_out[0])
+            list_lin2_out.append(lin_out[1])
+            list_lin3_out.append(lin_out[2])
 
         list_idx = np.array(list_of_idx)
         list_latent = np.array(list_latent)
         list_mean = np.array(list_mean)
         list_std = np.array(list_std)
+        list_lin1_out = np.array(list_lin1_out)
+        list_lin2_out = np.array(list_lin2_out)
+        list_lin3_out = np.array(list_lin3_out)
 
-        if running_experiment == 1:
+        if running_experiment == '1':
             self.experiement_one_plot_helper(
                 list_idx, list_latent, list_mean, list_std)
-        elif running_experiment == 2:
+        elif running_experiment == '2':
             self.experiment_two_plot_helper(
                 list_idx, list_latent, list_mean, list_std)
-        elif running_experiment == 3:
+        elif running_experiment == '3':
             self.experiment_three_plot_helper(
                 list_idx, list_latent, list_mean, list_std)
+        elif running_experiment == 'a':
+            self.experiment_a_plot_helper(
+                list_idx, list_latent, list_lin1_out, list_lin2_out, list_lin3_out)
