@@ -30,18 +30,55 @@ class LatentSpacePlotter:
             params_zCx = (mean, log_var)
 
             # Sample z from q(z|x)
+            print("mean", mean.shape)
+            print("mean", mean)
             sample_zCx = self.model.reparameterize(mean, log_var)
+            print("sample_zCx", sample_zCx.shape)
+            print("sample_zCx", sample_zCx)
 
             output = self.model.decoder(sample_zCx)
 
         return sample_zCx, params_zCx, output, mean, log_var
 
-    def imshow(self, img):
-        """Function to show an image."""
-        # ... [rest of your existing method here]
-        img = img / 2 + 0.5  # unnormalize if normalization was applied during pre-processing
-        npimg = img.numpy()
-        plt.imshow(np.transpose(npimg, (1, 2, 0)))
+    # def imshow(self, img):
+    #     """Function to show an image."""
+    #     # ... [rest of your existing method here]
+    #     img = img / 2 + 0.5  # unnormalize if normalization was applied during pre-processing
+    #     npimg = img.numpy()
+    #     plt.imshow(np.transpose(npimg, (1, 2, 0)))
+    #     plt.show()
+
+    def imshow(self, img_batch, captions, title=None):
+        """Function to show images with captions.
+
+        Args:
+            img_batch (Tensor): A batch of images (tensor) of shape (N, C, H, W).
+            captions (list of str): A list of captions (one for each image).
+
+        """
+        # Number of images
+        num_images = len(img_batch)
+
+        # Create a subplot
+        fig, axes = plt.subplots(1, num_images, figsize=(num_images * 3, 3))
+
+        for idx, img in enumerate(img_batch):
+            # Unnormalize and convert to numpy
+            img = img / 2 + 0.5
+            npimg = img.numpy()
+            npimg = np.transpose(npimg, (1, 2, 0))
+
+            # Plotting
+            if num_images == 1:
+                axes.imshow(npimg)
+                axes.set_title(captions[idx])
+                axes.axis('off')
+            else:
+                axes[idx].imshow(npimg)
+                axes[idx].set_title(captions[idx])
+                axes[idx].axis('off')
+        fig.suptitle(title)
+        plt.tight_layout()
         plt.show()
 
     def latent_to_index(self, latents):
@@ -99,6 +136,29 @@ class LatentSpacePlotter:
             list_of_idx.append(self.latent_to_index(latent_behavior))
             list_latent.append(latent_behavior)
         return list_of_idx, list_latent
+
+    def experiment_four_plot_helper(self, list_of_idx, list_latent, list_mean, list_std, dim_manipulate, new_dim_value, decoder_output):
+
+        print("ORIGINAL list_mean", list_mean)
+        print("mean:, ", list_mean.shape)
+        original_list_mean = list_mean[0].copy()
+        for i in range(len(dim_manipulate)):
+            list_mean[0][dim_manipulate[i]] = new_dim_value[i]
+
+        print("NEW list_mean", list_mean)
+
+        list_mean = torch.tensor(list_mean)
+        manipulated_output = self.model.decoder(list_mean).detach()
+
+        print("decoder_output", decoder_output.shape)
+        print("manipulated_output", manipulated_output.shape)
+
+        caption_original = f"{original_list_mean}(Original Image)"
+        caption_manipulated = f"{list_mean[0].detach().numpy()}(Manipulated Image)"
+
+        title = f"Original v.s. Manipulated {list_latent[0]}, for dimensions {dim_manipulate}, changed to {new_dim_value}"
+        self.imshow([decoder_output[0], manipulated_output[0]], [
+                    caption_original, caption_manipulated], title=title)
 
     def experiement_one_plot_helper(self, list_of_idx, list_latent, list_mean, list_std):
         class_info = list_latent[:, -1]
@@ -392,7 +452,8 @@ class LatentSpacePlotter:
                 "(Experiment 1): Incremently increase the x from 0 to 31, while measuring the difference between the \n" +  \
                 "latent dimensions for each x when y = 0 v.s. y = 31 for the shape ellipse, rotation 0, and size 3?\n" + \
                 "(Experiment 2): Hold X to be constant at 0, and incremently increase the y from 0 to 31, while visualizing the difference in latent space, for the shape ellipse, rotation 0, and size 3 \n" + \
-                "(Experiment 3): Repetition of Experiment 2, except you can control shape, and input multiple possible X" +\
+                "(Experiment 3): Repetition of Experiment 2, except you can control shape, and input multiple possible X \n" +\
+                "(Experiment 4): Manipulation of multiple latent dimensions \n" +\
                 "Experiment Number (ENTER): "
 
             automatic_choice = input(
@@ -437,6 +498,33 @@ class LatentSpacePlotter:
                     list_latent.extend(cur_list_latent)
                 running_experiment = 3
                 break
+            elif automatic_choice == '4':
+                running_experiment = 4
+                print("Please Enter the Original Desired Image Information as below \n")
+                latent_behavior = self.ask_user_input()
+                list_of_idx.append(self.latent_to_index(latent_behavior))
+                list_latent.append(latent_behavior)
+
+                dim_manipulate = []
+                new_dim_value = []
+                while True:
+                    prompt = "Out of the 10 latent dimensions, which one do you want to manipulate? Enter a number from 0 to 9: \n (ENTER): "
+                    try:
+                        dim_manipulate.append(int(input(prompt).strip()))
+                    except ValueError:
+                        print("Invalid input. Please enter a number.")
+                    prompt = "What would you want the new value of that latent dimension be? Enter a number between -3 to 3 \n (ENTER): "
+                    try:
+                        new_dim_value.append(float(input(prompt).strip()))
+                    except ValueError:
+                        print("Invalid input. Please enter a number.")
+
+                    # Ask if the user wants to continue
+                    continue_choice = input(
+                        "Do you want to manipulate another latent dimension? Enter 'N' to exit, any other key to continue:\n ").strip().upper()
+                    if continue_choice == 'N':
+                        break
+                break
 
             latent_behavior = self.ask_user_input()
             list_latent.append(latent_behavior)
@@ -473,3 +561,6 @@ class LatentSpacePlotter:
         elif running_experiment == 3:
             self.experiment_three_plot_helper(
                 list_idx, list_latent, list_mean, list_std)
+        elif running_experiment == 4:
+            self.experiment_four_plot_helper(
+                list_idx, list_latent, list_mean, list_std, dim_manipulate, new_dim_value, decoder_output)
