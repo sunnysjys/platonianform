@@ -2,10 +2,11 @@ from matplotlib import pyplot as plt
 import numpy as np
 import torch
 import argparse
+import itertools
 import seaborn as sns
 from scipy.stats import norm
 import random
-
+from matplotlib.colors import LinearSegmentedColormap
 
 class LatentSpacePlotter:
     def __init__(self, model, dataloader, device):
@@ -146,6 +147,16 @@ class LatentSpacePlotter:
             list_latent.append(latent_behavior)
         return list_of_idx, list_latent
 
+    def experiment_a_vary_x_y(self, shape=0):
+        list_of_idx = []
+        list_latent = []
+        for x in range(32):
+            for y in range(32):
+                latent_behavior = [0., shape, 3., 0., x, y]
+                list_of_idx.append(self.latent_to_index(latent_behavior))
+                list_latent.append(latent_behavior)
+        return list_of_idx, list_latent
+
     def experiment_five_generate_delta_vector(self, shape):
         # This function is going to hold shape constant, and generate all the other possible combinations of x and y, and size
         list_of_idx = []
@@ -276,38 +287,91 @@ class LatentSpacePlotter:
         self.experiment_five_plot_N_random_samples(first_shape_list_of_idx, first_shape_list_latent,
                                                    second_shape_list_of_idx, second_shape_list_latent, first_shape_mean, second_shape_mean, first_shape_std, second_shape_std, delta_mean_vector, delta_std_vector, N=10)
 
-    def experiment_a_plot_helper(self, list_of_idx, list_latent, list_lin1_out, list_lin2_out, list_lin3_out):
+    def plot_neuron_heatmap(self, neuron_id, X, grid_size=(32, 32)):
+        """
+        Plots a heatmap for the specified neuron's activation values, 
+        with the heat values normalized to be between -3 and +3 standard deviations.
+
+        :param neuron_id: ID of the neuron to plot.
+        :param X: Dictionary with neuron IDs as keys and lists of normalized outputs as values.
+        :param grid_size: The dimensions of the grid (width, height).
+        """
+        # Extract the activation values for the given neuron
+        activation_values = X.get(neuron_id, [])
+        
+        # Reshape the list into a 2D array
+        activation_matrix = np.array(activation_values).reshape(grid_size)
+        
+        cmap = LinearSegmentedColormap.from_list(
+        'custom_colormap', 
+        [(0, 'darkblue'), (0.5, 'white'), (1, 'darkred')],
+        N=256
+        )
+
+        # Plotting the heatmap
+        plt.imshow(activation_matrix, cmap=cmap, interpolation='nearest', vmin=-3, vmax=3)
+        # Plotting the heatmap
+        plt.colorbar()
+        plt.title(f"Heatmap for Neuron {neuron_id}, with shape 2, size 3, rotation 0")
+        plt.savefig(f"/Users/junyangsun/Documents/GitHub/platonianform/Experiment_results/experiment_a/shape_2/{neuron_id}_shape_2_size_3_rotation_0_heatmap.png")
+        plt.clf()
+
+    def experiment_a_plot(self, map_lin1_out, map_lin2_out, map_lin3_out):
+        lin1_means, lin1_stds, lin2_means, lin2_stds, lin3_means, lin3_stds = self.experiment_a_linear_layer_mean_std(map_lin1_out, map_lin2_out, map_lin3_out)
+        A = map_lin1_out
+        B = lin1_means
+        C = lin1_stds
+        X = {neuron_id: [] for neuron_id in range(256)}  # Initialize X with 256 neuron IDs
+
+        for key in A:
+            neuron_outputs = A[key][0]
+            for neuron_id, output in enumerate(neuron_outputs):
+                if C[0, neuron_id] != 0:  # To avoid division by zero
+                    normalized_output = (output - B[0, neuron_id]) / C[0, neuron_id]
+                else:
+                    normalized_output = 0  # If standard deviation is 0, normalization is not meaningful
+                X[neuron_id].append(normalized_output)
+
+        # X is now the dictionary with neuron IDs as keys and lists of normalized outputs as values
+        # Plotting the heatmap for neuron id
+        for id in range(256):
+            self.plot_neuron_heatmap(id, X)
+
+        
+    def experiment_a_plot_helper(self, map_lin1_out, map_lin2_out, map_lin3_out):
         # get the mean and std of the each neuron in each linear layer
-        lin1_means, lin1_stds, lin2_means, lin2_stds, lin3_means, lin3_stds = self.experiment_a_linear_layer_mean_std(
-            list_lin1_out, list_lin2_out, list_lin3_out)
-        # find the neurons that fire bigger than the mean + 1 std
-        lin1_neurons_fired = self.experiment_a_find_neurons_fired(
-            list_lin1_out, lin1_means, lin1_stds)
-        lin2_neurons_fired = self.experiment_a_find_neurons_fired(
-            list_lin2_out, lin2_means, lin2_stds)
-        lin3_neurons_fired = self.experiment_a_find_neurons_fired(
-            list_lin3_out, lin3_means, lin3_stds)
-        print("lin1", lin1_neurons_fired)
-        print("lin2", lin2_neurons_fired)
-        print("lin3", lin3_neurons_fired)
-        # plot the activation of neurons for each experiment and have the neuron firing in a gradient of colors
+        lin1_means, lin1_stds, lin2_means, lin2_stds, lin3_means, lin3_stds = self.experiment_a_linear_layer_mean_std(map_lin1_out, map_lin2_out, map_lin3_out)
+        # find the neurons that fire bigger than the mean + 2 std
+        lin1_neurons_fired = self.experiment_a_find_neurons_fired(map_lin1_out, lin1_means, lin1_stds)
+        # lin2_neurons_fired = self.experiment_a_find_neurons_fired(map_lin2_out, lin2_means, lin2_stds)
+        # lin3_neurons_fired = self.experiment_a_find_neurons_fired(map_lin3_out, lin3_means, lin3_stds)
 
-    def experiment_a_find_neurons_fired(self, list_lin_out, lin_means, lin_stds):
+        self.experiment_a_plot(map_lin1_out, map_lin2_out, map_lin3_out)
+
+    def experiment_a_find_neurons_fired(self, map_lin_out, lin_means, lin_stds):
+        # return a map of latent_behavior:[neurons_fired]
         # have neurons_fired in an array per experiment, (experiment_size, num_neurons_fired)
-        neurons_fired = [[] for i in range(list_lin_out.shape[0])]
-        # number of experiments
-        for i in range(list_lin_out.shape[0]):
-            # number of neurons
-            for j in range(list_lin_out.shape[2]):
-                if list_lin_out[i, :, j] > lin_means[:, j] + 2 * lin_stds[:, j]:
-                    # append the index of the neuron
-                    neurons_fired[i].append(j)
-        return neurons_fired
+        map_neurons_fired = {key:[] for key in map_lin_out.keys()}
 
-    def experiment_a_linear_layer_mean_std(self,
-                                           list_lin1_out,  # experiment_size, 1, 256
-                                           list_lin2_out,  # experiment_size, 1, 256
-                                           list_lin3_out):  # experiment_size, 1, 512
+        assert len(map_neurons_fired.keys()) == 1024, "There should be 1024 experiments"
+        # number of experiments
+        for key, _ in map_lin_out.items():
+            # number of neurons
+            for j in range(lin_means.shape[1]):
+                if map_lin_out[key][:, j] > lin_means[0, j] + 2 * lin_stds[0, j]:
+                    # append the index of the neuron 
+                    map_neurons_fired[key].append(j)
+        return map_neurons_fired
+
+    def experiment_a_linear_layer_mean_std(self, 
+                                           map_lin1_out, # experiment_size, 1, 256
+                                           map_lin2_out, # experiment_size, 1, 256
+                                           map_lin3_out): # experiment_size, 1, 512
+        # returns mean and std for all neurons across the experiments 
+        # turn map_lin1_out items into an array
+        list_lin1_out = np.stack(list(map_lin1_out.values()))
+        list_lin2_out = np.stack(list(map_lin2_out.values()))
+        list_lin3_out = np.stack(list(map_lin3_out.values()))
         lin1_means = np.mean(list_lin1_out, axis=0)
         lin1_stds = np.std(list_lin1_out, axis=0)
         lin2_means = np.mean(list_lin2_out, axis=0)
@@ -686,9 +750,9 @@ class LatentSpacePlotter:
         list_latent = []
         list_mean = []
         list_std = []
-        list_lin1_out = []
-        list_lin2_out = []
-        list_lin3_out = []
+        map_lin1_out = {}
+        map_lin2_out = {}
+        map_lin3_out = {}
 
         running_experiment = False
         while True:
@@ -699,7 +763,9 @@ class LatentSpacePlotter:
                 "(Experiment 3): Repetition of Experiment 2, except you can control shape, and input multiple possible X \n" +\
                 "(Experiment 4): Manipulation of multiple latent dimensions \n\n" +\
                 "(Experiment 5): Generating the delta vector between two shapes (hold rotation constant)" +\
-                "(Experiment a): Hold shape, scale, rotation, and x position constant, and only vary y position from 0 to 31, while measuring the mean and std of neurons in the three linear layers\n" + \
+                "(Experiment a): Hold shape, scale, and rotation constant, and vary (x, y) position each from 0 to 31, while measuring the mean and std of neurons in the three linear layers. \n" + \
+                "Generate a heatmap for each neuron in each linear layer, with the heat values normalized to be between -3 and +3 standard deviations. \n" + \
+                "NEED TO MANUALLY CHANGE SHAPE FOLDER IN EXPERIMENT A PLOT HELPER \n" + \
                 "Experiment Number (ENTER): "
 
             automatic_choice = input(
@@ -745,28 +811,12 @@ class LatentSpacePlotter:
                 running_experiment = '3'
                 break
             elif automatic_choice == 'a':
-                print("experiment a ")
-                prompt = "What values of X do you want to hold it to be constant at? Please enter them separated by a comma \n (ENTER): "
-                try:
-                    x_values = input(prompt).strip()
-                    x_values = list(map(int, x_values.split(',')))
-                except ValueError:
-                    print("Invalid input. Please enter numbers separated by a comma.")
-
                 prompt = "What shape do you want to choose? Enter 0 for square, 1 for ellipse, 2 for heart: \n (ENTER): "
                 try:
                     shape = int(input(prompt).strip())
                 except ValueError:
                     print("Invalid input. Please enter a number.")
-
-                list_of_idx = []
-                list_latent = []
-                for x_value in x_values:
-                    # calling other experiment's helper to get the list of idx and list of latents
-                    cur_list_of_idx, cur_list_latent = self.experiment_three_hold_x_constant_incremently_increase_y(
-                        x_value, shape)
-                    list_of_idx.extend(cur_list_of_idx)
-                    list_latent.extend(cur_list_latent)
+                list_of_idx, list_latent = self.experiment_a_vary_x_y(shape)
                 running_experiment = 'a'
                 break
             elif automatic_choice == '4':
@@ -819,8 +869,6 @@ class LatentSpacePlotter:
                     second_shape)
                 break
 
-            print("automatic choice", automatic_choice)
-
             latent_behavior = self.ask_user_input()
             list_latent.append(latent_behavior)
             list_of_idx.append(self.latent_to_index(latent_behavior))
@@ -844,12 +892,16 @@ class LatentSpacePlotter:
                 std = np.array(np.sqrt(np.exp(log_var[0])))
                 mean = np.array(mean[0])
 
-                list_mean.append(mean)
-                list_std.append(std)
-                list_lin1_out.append(lin_out[0])
-                list_lin2_out.append(lin_out[1])
-                list_lin3_out.append(lin_out[2])
+            list_mean.append(mean)
+            list_std.append(std)
+            map_lin1_out[str(list_latent[i][-2:])] = lin_out[0].detach().numpy()
+            map_lin2_out[str(list_latent[i][-2:])] = lin_out[1].detach().numpy()
+            map_lin3_out[str(list_latent[i][-2:])] = lin_out[2].detach().numpy()
 
+        list_idx = np.array(list_of_idx)
+        list_latent = np.array(list_latent)
+        list_mean = np.array(list_mean)
+        list_std = np.array(list_std)
         if running_experiment == '1':
             self.experiement_one_plot_helper(
                 list_idx, list_latent, list_mean, list_std)
@@ -871,7 +923,7 @@ class LatentSpacePlotter:
             list_lin2_out = np.array(list_lin2_out)
             list_lin3_out = np.array(list_lin3_out)
             self.experiment_a_plot_helper(
-                list_idx, list_latent, list_lin1_out, list_lin2_out, list_lin3_out)
+                list_idx, list_latent, map_lin1_out, map_lin2_out, map_lin3_out)
         elif running_experiment == '5':
             self.experiment_five_plot_helper(
                 first_shape_list_of_idx, first_shape_list_latent, second_shape_list_of_idx, second_shape_list_latent)
