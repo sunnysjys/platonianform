@@ -51,7 +51,7 @@ class LatentSpacePlotter:
     #     plt.imshow(np.transpose(npimg, (1, 2, 0)))
     #     plt.show()
 
-    def imshow(self, img_batch, captions=None, title=None):
+    def imshow(self, img_batch, captions=None, title=None, save_path=None):
         """Function to show images with captions.
 
         Args:
@@ -61,9 +61,9 @@ class LatentSpacePlotter:
         """
         # Number of images
         num_images = len(img_batch)
-        print("img_batch", img_batch)
+        # print("img_batch", img_batch)
         # Create a subplot
-        fig, axes = plt.subplots(1, num_images, figsize=(num_images * 3, 3))
+        fig, axes = plt.subplots(1, num_images, figsize=(num_images * 4, 4))
 
         for idx, img in enumerate(img_batch):
             # Unnormalize and convert to numpy
@@ -86,7 +86,11 @@ class LatentSpacePlotter:
                 axes[idx].axis('off')
         fig.suptitle(title)
         plt.tight_layout()
-        plt.show()
+        if save_path:
+            plt.savefig(save_path)
+            plt.clf()
+        else:
+            plt.show()
 
     def latent_to_index(self, latents):
         return np.dot(latents, self.latents_bases).astype(int)
@@ -154,11 +158,34 @@ class LatentSpacePlotter:
             for y in range(32):
                 # for size in [3]:
                 for size in range(6):
-                    for rotation in range(40):
+                    # for rotation in range(40):
+                    for rotation in [0.]:
                         latent_behavior = [0., shape, size, rotation, x, y]
                         list_of_idx.append(
                             self.latent_to_index(latent_behavior))
                         list_latent.append(latent_behavior)
+        return list_of_idx, list_latent
+
+    def experiment_seven_generate_delta_vector(self, position, position_value):
+        list_of_idx = []
+        list_latent = []
+
+        for shape in range(3):
+            for size in range(6):
+                for rotation in range(40):
+                    for other_position in range(32):
+                        latent_behavior = [0., shape, size, rotation]
+                        if position == 0:
+                            latent_behavior.extend(
+                                [position_value, other_position])
+                        else:
+                            latent_behavior.extend(
+                                [other_position, position_value])
+
+                        list_of_idx.append(
+                            self.latent_to_index(latent_behavior))
+                        list_latent.append(latent_behavior)
+
         return list_of_idx, list_latent
 
     def experiement_one_plot_helper(self, list_of_idx, list_latent, list_mean, list_std):
@@ -212,13 +239,13 @@ class LatentSpacePlotter:
         for i in range(len(dim_manipulate)):
             list_mean[0][dim_manipulate[i]] = new_dim_value[i]
 
-        print("NEW list_mean", list_mean)
+        # print("NEW list_mean", list_mean)
 
         list_mean = torch.tensor(list_mean)
         manipulated_output = self.model.decoder(list_mean).detach()
 
-        print("decoder_output", decoder_output.shape)
-        print("manipulated_output", manipulated_output.shape)
+        # print("decoder_output", decoder_output.shape)
+        # print("manipulated_output", manipulated_output.shape)
 
         caption_original = f"{original_list_mean}(Original Image)"
         caption_manipulated = f"{list_mean[0].detach().numpy()}(Manipulated Image)"
@@ -275,6 +302,107 @@ class LatentSpacePlotter:
 
         self.experiment_five_plot_N_random_samples(first_shape_list_of_idx, first_shape_list_latent,
                                                    second_shape_list_of_idx, second_shape_list_latent, first_shape_mean, second_shape_mean, first_shape_std, second_shape_std, delta_mean_vector, delta_std_vector, N=10)
+
+    def experiment_six_plot_helper(self, first_shape_list_of_idx, first_shape_list_latent, second_shape_list_of_idx, second_shape_list_latent):
+
+        first_shape_mean = []
+        first_shape_std = []
+        second_shape_mean = []
+        second_shape_std = []
+
+        for i in range(len(first_shape_list_latent)):
+            # print(
+            #     "for idx", first_shape_list_of_idx[i], "for user input", first_shape_list_latent[i])
+            # photo = self.dataloader.dataset[list_of_idx[i]]
+
+            samples_zCx, params_zCx, decoder_output, mean, log_var, lin_out, conv_out, conv_weights_tuple = self._compute_q_zCx_single(
+                self.dataloader, first_shape_list_of_idx[i])
+
+            first_shape_std.append(np.array(np.sqrt(np.exp(log_var[0]))))
+            first_shape_mean.append(np.array(mean[0]))
+
+        for i in range(len(second_shape_list_latent)):
+            # print("for idx", second_shape_list_of_idx[i],
+            #       "for user input", second_shape_list_latent[i])
+            # photo = self.dataloader.dataset[list_of_idx[i]]
+
+            samples_zCx, params_zCx, decoder_output, mean, log_var, lin_out, conv_out, conv_weights_tuple = self._compute_q_zCx_single(
+                self.dataloader, second_shape_list_of_idx[i])
+
+            second_shape_std.append(np.array(np.sqrt(np.exp(log_var[0]))))
+            second_shape_mean.append(np.array(mean[0]))
+
+        first_shape_mean = np.array(first_shape_mean)
+        second_shape_mean = np.array(second_shape_mean)
+
+        first_shape_std = np.array(first_shape_std)
+        second_shape_std = np.array(second_shape_std)
+
+        delta_mean = first_shape_mean - second_shape_mean
+        delta_std = first_shape_std - second_shape_std
+
+        delta_mean_vector = np.mean(delta_mean, axis=0)
+        delta_std_vector = np.mean(delta_std, axis=0)
+
+        print("delta_mean_vector", delta_mean_vector)
+        print("delta_std_vector", delta_std_vector)
+        print("first_shape_mean", first_shape_mean.shape)
+        print("second_shape_mean", second_shape_mean.shape)
+
+        _, _ = self.experiment_five_plot_average_latent_space(first_shape_list_latent, second_shape_list_latent,
+                                                              np.mean(first_shape_mean, axis=0), np.mean(second_shape_mean, axis=0), np.mean(first_shape_std, axis=0), np.mean(second_shape_std, axis=0))
+        _, _ = self.experiment_five_plot_average_latent_space(first_shape_list_latent, second_shape_list_latent,
+                                                              delta_mean_vector, delta_mean_vector, delta_std_vector, delta_std_vector)
+
+        self.experiment_five_plot_N_random_samples(first_shape_list_of_idx, first_shape_list_latent,
+                                                   second_shape_list_of_idx, second_shape_list_latent, first_shape_mean, second_shape_mean, first_shape_std, second_shape_std, delta_mean_vector, delta_std_vector, N=10)
+
+    def experiment_seven_plot_helper(self, first_position_list_of_idx, first_position_list_latent, second_position_list_of_idx, second_position_list_latent):
+        first_position_mean = []
+        first_position_std = []
+        second_position_mean = []
+        second_position_std = []
+
+        for i in range(len(first_position_list_latent)):
+
+            samples_zCx, params_zCx, decoder_output, mean, log_var, lin_out, conv_out, conv_weights_tuple = self._compute_q_zCx_single(
+                self.dataloader, first_position_list_of_idx[i])
+
+            first_position_std.append(np.array(np.sqrt(np.exp(log_var[0]))))
+            first_position_mean.append(np.array(mean[0]))
+
+        for i in range(len(second_position_list_latent)):
+
+            samples_zCx, params_zCx, decoder_output, mean, log_var, lin_out, conv_out, conv_weights_tuple = self._compute_q_zCx_single(
+                self.dataloader, second_position_list_of_idx[i])
+
+            second_position_std.append(np.array(np.sqrt(np.exp(log_var[0]))))
+            second_position_mean.append(np.array(mean[0]))
+
+        first_position_mean = np.array(first_position_mean)
+        second_position_mean = np.array(second_position_mean)
+
+        first_position_std = np.array(first_position_std)
+        second_position_std = np.array(second_position_std)
+
+        delta_mean = first_position_mean - second_position_mean
+        delta_std = first_position_std - second_position_std
+
+        delta_mean_vector = np.mean(delta_mean, axis=0)
+        delta_std_vector = np.mean(delta_std, axis=0)
+
+        print("delta_mean_vector", delta_mean_vector)
+        print("delta_std_vector", delta_std_vector)
+        print("first_position_mean", first_position_mean.shape)
+        print("second_position_mean", second_position_mean.shape)
+
+        _, _ = self.experiment_five_plot_average_latent_space(first_position_list_latent, second_position_list_latent,
+                                                              np.mean(first_position_mean, axis=0), np.mean(second_position_mean, axis=0), np.mean(first_position_std, axis=0), np.mean(second_position_std, axis=0))
+        _, _ = self.experiment_five_plot_average_latent_space(first_position_list_latent, second_position_list_latent,
+                                                              delta_mean_vector, delta_mean_vector, delta_std_vector, delta_std_vector)
+
+        self.experiment_five_plot_N_random_samples(first_position_list_of_idx, first_position_list_latent,
+                                                   second_position_list_of_idx, second_position_list_latent, first_position_mean, second_position_mean, first_position_std, second_position_std, delta_mean_vector, delta_std_vector, N=20, experiment_number=7)
 
     def experiment_a_plot_helper(self, list_of_idx, list_latent, list_lin1_out, list_lin2_out, list_lin3_out):
         # get the mean and std of the each neuron in each linear layer
@@ -600,7 +728,7 @@ class LatentSpacePlotter:
         return delta_vector_mean, delta_vector_std
 
     def experiment_five_plot_N_random_samples(self, first_shape_list_of_idx, first_shape_list_latent,
-                                              second_shape_list_of_idx, second_shape_list_latent, first_shape_mean, second_shape_mean, first_shape_std, second_shape_std, delta_mean_vector, delta_std_vector, N=10):
+                                              second_shape_list_of_idx, second_shape_list_latent, first_shape_mean, second_shape_mean, first_shape_std, second_shape_std, delta_mean_vector, delta_std_vector, N=10, experiment_number=5):
         # This function is going to sample 5 random samples from the first_shape, subtract the delta vector for the latent space,
         # sample from the updated latent space, and then plot original image, the original reconstructed image,
         # and the reconstructed image after applying the delta vector.
@@ -613,7 +741,7 @@ class LatentSpacePlotter:
         for idx in random_first_shape_idx:
 
             original_input_photo = self.dataloader.dataset[first_shape_list_of_idx[idx]]
-            print("original_input_photo", original_input_photo)
+            # print("original_input_photo", original_input_photo)
 
             mean = first_shape_mean[idx]
             log_var = second_shape_std[idx]
@@ -621,7 +749,7 @@ class LatentSpacePlotter:
 
             # convert sample_zCx from a numpy N vector to a 1XN tensor array
             sample_zCx = torch.tensor(sample_zCx).unsqueeze(0)
-            print("original sample_zCx", sample_zCx)
+            # print("original sample_zCx", sample_zCx)
             original_output_image, lin_outputs, conv_outputs, conv_weights_tuple = self.model.decoder(
                 sample_zCx)
 
@@ -633,15 +761,19 @@ class LatentSpacePlotter:
             # sample_zCx = self.model.reparameterize(mean, log_var)
             # sample_zCx = torch.tensor(sample_zCx).unsqueeze(0)
             sample_zCx = torch.tensor(mean).unsqueeze(0)
-            print("modified sample_zCx", sample_zCx)
+            # print("modified sample_zCx", sample_zCx)
             manipulated_image, lin_outputs, conv_outputs, conv_weights_tuple = self.model.decoder(
                 sample_zCx)
 
             manipulated_image = manipulated_image.detach()[0]
-            print("manipulated_image", manipulated_image)
+            # print("manipulated_image", manipulated_image)
 
-            self.imshow([original_output_image, manipulated_image], [
-                        "Original Reconstructed Image", "Manipulated Image"], title=f"Original Shape = {first_shape_list_latent[idx][1]}, Intended Manipulated Shape = {second_shape_list_latent[idx][1]}")
+            if experiment_number == 5 or experiment_number == 6:
+                self.imshow([original_output_image, manipulated_image], [
+                            "Original Reconstructed Image", "Manipulated Image"], title=f"Original Latent: {first_shape_list_latent[idx][1]}, Intended Manipulated Latent: {second_shape_list_latent[idx][1]}")
+            elif experiment_number == 7:
+                self.imshow([original_output_image, manipulated_image], [
+                    "Original Reconstructed Image", "Manipulated Image"], title=f"Original Latent: {first_shape_list_latent[idx]}, Intended Manipulated Latent: {second_shape_list_latent[idx]}", save_path=f"../Experimental_Results/experiment_seven/original_{str(first_shape_list_latent[idx])}_manipulated_{str(second_shape_list_latent[idx])}.png")
 
         random_second_shape_idx = random.sample(
             range(0, len(second_shape_list_of_idx)), N//2)
@@ -649,7 +781,7 @@ class LatentSpacePlotter:
         for idx in random_second_shape_idx:
 
             original_input_photo = self.dataloader.dataset[second_shape_list_of_idx[idx]]
-            print("original_input_photo", original_input_photo)
+            # print("original_input_photo", original_input_photo)
 
             mean = second_shape_mean[idx]
             log_var = second_shape_std[idx]
@@ -657,7 +789,7 @@ class LatentSpacePlotter:
 
             # convert sample_zCx from a numpy N vector to a 1XN tensor array
             sample_zCx = torch.tensor(sample_zCx).unsqueeze(0)
-            print("unmodified sample_zCx", sample_zCx)
+            # print("unmodified sample_zCx", sample_zCx)
             original_output_image, lin_outputs, conv_outputs, conv_weights_tuple = self.model.decoder(
                 sample_zCx)
 
@@ -669,16 +801,20 @@ class LatentSpacePlotter:
             # sample_zCx = self.model.reparameterize(mean, log_var)
             # sample_zCx = torch.tensor(sample_zCx).unsqueeze(0)
             sample_zCx = torch.tensor(mean).unsqueeze(0)
-            print("modified sample_zCx", sample_zCx)
+            # print("modified sample_zCx", sample_zCx)
             manipulated_image, lin_outputs, conv_outputs, conv_weights_tuple = self.model.decoder(
                 sample_zCx)
 
             manipulated_image = manipulated_image.detach()[0]
 
-            print("manipulated_image", manipulated_image)
+            # print("manipulated_image", manipulated_image)
 
-            self.imshow([original_output_image, manipulated_image], [
-                        "Original Reconstructed Image", "Manipulated Image"], title=f"Original Shape = {second_shape_list_latent[idx][1]}, Intended Manipulated Shape = {first_shape_list_latent[idx][1]}")
+            if experiment_number == 5 or experiment_number == 6:
+                self.imshow([original_output_image, manipulated_image], [
+                            "Original Reconstructed Image", "Manipulated Image"], title=f"Original Shape = {first_shape_list_latent[idx][1]}, Intended Manipulated Shape = {second_shape_list_latent[idx][1]}")
+            elif experiment_number == 7:
+                self.imshow([original_output_image, manipulated_image], [
+                    "Original Reconstructed Image", "Manipulated Image"], title=f"Original Latent: {first_shape_list_latent[idx]}, Intended Manipulated Latent: {second_shape_list_latent[idx]}", save_path=f"../Experimental_Results/experiment_seven/original_{str(first_shape_list_latent[idx])}_manipulated_{str(second_shape_list_latent[idx])}.png")
 
     def main_experiment(self):
 
@@ -698,7 +834,9 @@ class LatentSpacePlotter:
                 "(Experiment 2): Hold X to be constant at 0, and incremently increase the y from 0 to 31, while visualizing the difference in latent space, for the shape ellipse, rotation 0, and size 3 \n" + \
                 "(Experiment 3): Repetition of Experiment 2, except you can control shape, and input multiple possible X \n" +\
                 "(Experiment 4): Manipulation of multiple latent dimensions \n\n" +\
-                "(Experiment 5): Generating the delta vector between two shapes (hold rotation constant)" +\
+                "(Experiment 5): Generating the delta vector between two shapes (hold rotation constant)\n" +\
+                "(Experiment 6): Experiment 5, except generate N delta vectors then average instead of averaging then generate 1 Delta Vector \n" +\
+                "(Experiment 7): Experiment 5 and 6, except generating the delta vector for location instead of shape \n" +\
                 "(Experiment a): Hold shape, scale, rotation, and x position constant, and only vary y position from 0 to 31, while measuring the mean and std of neurons in the three linear layers\n" + \
                 "Experiment Number (ENTER): "
 
@@ -796,8 +934,8 @@ class LatentSpacePlotter:
                     if continue_choice == 'N':
                         break
                 break
-            elif automatic_choice == '5':
-                running_experiment = '5'
+            elif automatic_choice == '5' or automatic_choice == '6':
+                running_experiment = automatic_choice
 
                 prompt = "Enter the two shapes you want to generate the delta vector for \n" + \
                     "Enter at least two, and separate them by a comma \n" + \
@@ -818,6 +956,33 @@ class LatentSpacePlotter:
                 second_shape_list_of_idx, second_shape_list_latent = self.experiment_five_generate_delta_vector(
                     second_shape)
                 break
+            elif automatic_choice == '7':
+                running_experiment = automatic_choice
+
+                prompt = "Do you want to investigate the delta vector for x position or y position? \n" + \
+                    "Enter 0 for x position, 1 for y position \n" +\
+                    "(ENTER): "
+
+                try:
+                    position = int(input(prompt).strip())
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
+
+                prompt = "What do you want to set the first position value to be? \n What do you want the second position value to be? \n Separate the two numbers with a comma \n" + \
+                    "(ENTER): "
+
+                try:
+                    position_values = input(prompt).strip()
+                    position_values = list(
+                        map(int, position_values.split(',')))
+                except ValueError:
+                    print("Invalid input. Please enter numbers separated by a comma.")
+
+                first_position_list_of_idx, first_position_list_latent = self.experiment_seven_generate_delta_vector(
+                    position, position_values[0])
+                second_position_list_of_idx, second_position_list_latent = self.experiment_seven_generate_delta_vector(
+                    position, position_values[1])
+                break
 
             print("automatic choice", automatic_choice)
 
@@ -829,8 +994,7 @@ class LatentSpacePlotter:
             if continue_choice == 'N':
                 break
 
-        if running_experiment != '5':
-            print("running_experimet", running_experiment)
+        if running_experiment != '5' or running_experiment != '6' or running_experiment != '7':
             for i in range(len(list_of_idx)):
                 # print("for idx", list_of_idx[i],
                 #       "for user input", list_latent[i])
@@ -875,3 +1039,9 @@ class LatentSpacePlotter:
         elif running_experiment == '5':
             self.experiment_five_plot_helper(
                 first_shape_list_of_idx, first_shape_list_latent, second_shape_list_of_idx, second_shape_list_latent)
+        elif running_experiment == '6':
+            self.experiment_six_plot_helper(
+                first_shape_list_of_idx, first_shape_list_latent, second_shape_list_of_idx, second_shape_list_latent)
+        elif running_experiment == '7':
+            self.experiment_seven_plot_helper(
+                first_position_list_of_idx, first_position_list_latent, second_position_list_of_idx, second_position_list_latent)
