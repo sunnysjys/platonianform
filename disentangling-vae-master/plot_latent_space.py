@@ -313,11 +313,11 @@ class LatentSpacePlotter:
         # Plotting the heatmap
         plt.colorbar()
         plt.title(f"Heatmap for Neuron {neuron_id}, with shape 2, size 3, rotation 0")
-        plt.savefig(f"/Users/junyangsun/Documents/GitHub/platonianform/Experiment_results/experiment_a/shape_2/{neuron_id}_shape_2_size_3_rotation_0_heatmap.png")
+        plt.savefig(f"../Experiment_results/experiment_a/shape_2/{neuron_id}_shape_2_size_3_rotation_0_heatmap.png")
         plt.clf()
 
-    def experiment_a_plot(self, map_lin1_out, map_lin2_out, map_lin3_out):
-        lin1_means, lin1_stds, lin2_means, lin2_stds, lin3_means, lin3_stds = self.experiment_a_linear_layer_mean_std(map_lin1_out, map_lin2_out, map_lin3_out)
+    def experiment_a_plot_linear(self, map_lin1_out):
+        lin1_means, lin1_stds = self.experiment_a_linear_layer_mean_std(map_lin1_out)
         A = map_lin1_out
         B = lin1_means
         C = lin1_stds
@@ -336,17 +336,16 @@ class LatentSpacePlotter:
         # Plotting the heatmap for neuron id
         for id in range(256):
             self.plot_neuron_heatmap(id, X)
-
         
     def experiment_a_plot_helper(self, map_lin1_out, map_lin2_out, map_lin3_out):
-        # get the mean and std of the each neuron in each linear layer
-        lin1_means, lin1_stds, lin2_means, lin2_stds, lin3_means, lin3_stds = self.experiment_a_linear_layer_mean_std(map_lin1_out, map_lin2_out, map_lin3_out)
+        # get the mean and std of the each neuron in the first linear layer
+        lin1_means, lin1_stds = self.experiment_a_linear_layer_mean_std(map_lin1_out)
         # find the neurons that fire bigger than the mean + 2 std
         lin1_neurons_fired = self.experiment_a_find_neurons_fired(map_lin1_out, lin1_means, lin1_stds)
         # lin2_neurons_fired = self.experiment_a_find_neurons_fired(map_lin2_out, lin2_means, lin2_stds)
         # lin3_neurons_fired = self.experiment_a_find_neurons_fired(map_lin3_out, lin3_means, lin3_stds)
 
-        self.experiment_a_plot(map_lin1_out, map_lin2_out, map_lin3_out)
+        self.experiment_a_plot_linear(map_lin1_out)
 
     def experiment_a_find_neurons_fired(self, map_lin_out, lin_means, lin_stds):
         # return a map of latent_behavior:[neurons_fired]
@@ -364,21 +363,13 @@ class LatentSpacePlotter:
         return map_neurons_fired
 
     def experiment_a_linear_layer_mean_std(self, 
-                                           map_lin1_out, # experiment_size, 1, 256
-                                           map_lin2_out, # experiment_size, 1, 256
-                                           map_lin3_out): # experiment_size, 1, 512
+                                           map_lin_out)
         # returns mean and std for all neurons across the experiments 
-        # turn map_lin1_out items into an array
-        list_lin1_out = np.stack(list(map_lin1_out.values()))
-        list_lin2_out = np.stack(list(map_lin2_out.values()))
-        list_lin3_out = np.stack(list(map_lin3_out.values()))
-        lin1_means = np.mean(list_lin1_out, axis=0)
-        lin1_stds = np.std(list_lin1_out, axis=0)
-        lin2_means = np.mean(list_lin2_out, axis=0)
-        lin2_stds = np.std(list_lin2_out, axis=0)
-        lin3_means = np.mean(list_lin3_out, axis=0)
-        lin3_stds = np.std(list_lin3_out, axis=0)
-        return lin1_means, lin1_stds, lin2_means, lin2_stds, lin3_means, lin3_stds
+        # turn map_lin_out items into an array
+        list_lin_out = np.stack(list(map_lin_out.values()))
+        lin_means = np.mean(list_lin_out, axis=0)
+        lin_stds = np.std(list_lin_out, axis=0)
+        return lin_means, lin_stds
 
     def experiment_one_plot_subtraction_per_data_point(self, means_class_0, means_class_31, std_class_0, std_class_31):
         # This function is going to plot the subtracted difference, per each specific x, the difference in means and standard deviations for y = 0 and y = 31
