@@ -892,11 +892,11 @@ class LatentSpacePlotter:
                 std = np.array(np.sqrt(np.exp(log_var[0])))
                 mean = np.array(mean[0])
 
-            list_mean.append(mean)
-            list_std.append(std)
-            map_lin1_out[str(list_latent[i][-2:])] = lin_out[0].detach().numpy()
-            map_lin2_out[str(list_latent[i][-2:])] = lin_out[1].detach().numpy()
-            map_lin3_out[str(list_latent[i][-2:])] = lin_out[2].detach().numpy()
+                list_mean.append(mean)
+                list_std.append(std)
+                map_lin1_out[str(list_latent[i][-2:])] = lin_out[0].detach().numpy()
+                map_lin2_out[str(list_latent[i][-2:])] = lin_out[1].detach().numpy()
+                map_lin3_out[str(list_latent[i][-2:])] = lin_out[2].detach().numpy()
 
         list_idx = np.array(list_of_idx)
         list_latent = np.array(list_latent)
@@ -915,15 +915,8 @@ class LatentSpacePlotter:
             self.experiment_four_plot_helper(
                 list_idx, list_latent, list_mean, list_std, dim_manipulate, new_dim_value, decoder_output)
         elif running_experiment == 'a':
-            list_idx = np.array(list_of_idx)
-            list_latent = np.array(list_latent)
-            list_mean = np.array(list_mean)
-            list_std = np.array(list_std)
-            list_lin1_out = np.array(list_lin1_out)
-            list_lin2_out = np.array(list_lin2_out)
-            list_lin3_out = np.array(list_lin3_out)
             self.experiment_a_plot_helper(
-                list_idx, list_latent, map_lin1_out, map_lin2_out, map_lin3_out)
+                map_lin1_out, map_lin2_out, map_lin3_out)
         elif running_experiment == '5':
             self.experiment_five_plot_helper(
                 first_shape_list_of_idx, first_shape_list_latent, second_shape_list_of_idx, second_shape_list_latent)
