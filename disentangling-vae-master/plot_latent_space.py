@@ -15,7 +15,7 @@ class LatentSpacePlotter:
         self.device = device
 
         dataset_zip = np.load(
-            '../dsprites/dsprites_ndarray_co1sh3sc6or40x32y32_64x64.npz', allow_pickle=True, encoding='latin1')
+            'dsprites/dsprites_ndarray_co1sh3sc6or40x32y32_64x64.npz', allow_pickle=True, encoding='latin1')
         self.metadata = dataset_zip['metadata'][()]
         self.latents_bases = np.concatenate((self.metadata["latents_sizes"][::-1].cumprod()[::-1][1:],
                                              np.array([1,])))
@@ -362,15 +362,14 @@ class LatentSpacePlotter:
                     map_neurons_fired[key].append(j)
         return map_neurons_fired
 
-    def experiment_a_linear_layer_mean_std(self, 
-                                           map_lin_out)
+    def experiment_a_linear_layer_mean_std(self, map_lin_out):
         # returns mean and std for all neurons across the experiments 
         # turn map_lin_out items into an array
         list_lin_out = np.stack(list(map_lin_out.values()))
         lin_means = np.mean(list_lin_out, axis=0)
         lin_stds = np.std(list_lin_out, axis=0)
         return lin_means, lin_stds
-
+    
     def experiment_one_plot_subtraction_per_data_point(self, means_class_0, means_class_31, std_class_0, std_class_31):
         # This function is going to plot the subtracted difference, per each specific x, the difference in means and standard deviations for y = 0 and y = 31
         assert means_class_0.shape == means_class_31.shape
@@ -735,6 +734,35 @@ class LatentSpacePlotter:
             self.imshow([original_output_image, manipulated_image], [
                         "Original Reconstructed Image", "Manipulated Image"], title=f"Original Shape = {second_shape_list_latent[idx][1]}, Intended Manipulated Shape = {first_shape_list_latent[idx][1]}")
 
+    def experiment_b_all_features(self):
+        # This function is going to generate all possible combinations of features 
+        # it outputs list_of_idx, list_latent
+        list_of_idx = []
+        list_latent = []
+        for shape in range(3):
+            for size in range(6):
+                for rotation in range(40):
+                    for x in range(32):
+                        for y in range(32):
+                            latent_behavior = [0., shape, size, rotation, x, y]
+                            list_of_idx.append(
+                                self.latent_to_index(latent_behavior))
+                            list_latent.append(latent_behavior)
+        assert(len(list_of_idx) == 3 * 6 * 40 * 32 * 32)
+        return list_of_idx, list_latent
+
+    def experiment_b_save_linear_layer_outputs(self, map_lin1_out):
+        # this function is going to save the linear layer outputs for each latent_behavior 
+        # it also generates the mean and std for each neuron and saves it separately
+        # map_lin1_out is a dictionary with key:latent_behavior, value:lin1_out (1, 256)
+        print("saving mean, std and lin1_out")
+        mean, std = self.experiment_a_linear_layer_mean_std(map_lin1_out)
+        assert(mean.shape == (1, 256))
+        assert(std.shape == (1, 256))
+        np.save("Experiment_results/experiment_b/lin1_out.npy", map_lin1_out)
+        np.save("Experiment_results/experiment_b/lin1_mean.npy", mean)
+        np.save("Experiment_results/experiment_b/lin1_std.npy", std)
+
     def main_experiment(self):
 
         list_of_idx = []
@@ -757,6 +785,7 @@ class LatentSpacePlotter:
                 "(Experiment a): Hold shape, scale, and rotation constant, and vary (x, y) position each from 0 to 31, while measuring the mean and std of neurons in the three linear layers. \n" + \
                 "Generate a heatmap for each neuron in each linear layer, with the heat values normalized to be between -3 and +3 standard deviations. \n" + \
                 "NEED TO MANUALLY CHANGE SHAPE FOLDER IN EXPERIMENT A PLOT HELPER \n" + \
+                "(Experiment b): Generate the first linear layer output for all combinations of features\n" + \
                 "Experiment Number (ENTER): "
 
             automatic_choice = input(
@@ -859,6 +888,10 @@ class LatentSpacePlotter:
                 second_shape_list_of_idx, second_shape_list_latent = self.experiment_five_generate_delta_vector(
                     second_shape)
                 break
+            elif automatic_choice == 'b':
+                running_experiment = 'b'
+                list_of_idx, list_latent = self.experiment_b_all_features()
+                break
 
             latent_behavior = self.ask_user_input()
             list_latent.append(latent_behavior)
@@ -874,21 +907,23 @@ class LatentSpacePlotter:
                 # print("for idx", list_of_idx[i],
                 #       "for user input", list_latent[i])
                 photo = self.dataloader.dataset[list_of_idx[i]]
-
                 samples_zCx, params_zCx, decoder_output, mean, log_var, lin_out, conv_out, conv_weights_tuple = self._compute_q_zCx_single(
                     self.dataloader, list_of_idx[i])
 
-                self.imshow(decoder_output)
+                # self.imshow(decoder_output)
 
                 std = np.array(np.sqrt(np.exp(log_var[0])))
                 mean = np.array(mean[0])
 
                 list_mean.append(mean)
                 list_std.append(std)
-                map_lin1_out[str(list_latent[i][-2:])] = lin_out[0].detach().numpy()
-                map_lin2_out[str(list_latent[i][-2:])] = lin_out[1].detach().numpy()
-                map_lin3_out[str(list_latent[i][-2:])] = lin_out[2].detach().numpy()
-
+                if running_experiment == 'a':
+                    key = str(list_latent[i][-2:])
+                else:
+                    key = str(list_latent[i])
+                map_lin1_out[key] = lin_out[0].detach().numpy()
+                map_lin2_out[key] = lin_out[1].detach().numpy()
+                map_lin3_out[key] = lin_out[2].detach().numpy()
         list_idx = np.array(list_of_idx)
         list_latent = np.array(list_latent)
         list_mean = np.array(list_mean)
@@ -911,3 +946,5 @@ class LatentSpacePlotter:
         elif running_experiment == '5':
             self.experiment_five_plot_helper(
                 first_shape_list_of_idx, first_shape_list_latent, second_shape_list_of_idx, second_shape_list_latent)
+        elif running_experiment == 'b':
+            self.experiment_b_save_linear_layer_outputs(map_lin1_out)
