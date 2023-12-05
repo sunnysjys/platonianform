@@ -887,7 +887,7 @@ class LatentSpacePlotter:
         map_fired_z_score_ind = { key : value / (32 * 40 * 6 * 3) for key, value in map_fired_z_score_ind.items() }
         return map_fired_z_score_ind
 
-    def experiment_f_neuron_idx_fired_for_all_x_z_score(self, neuron_index):
+    def experiment_f_neuron_idx_fired_for_all_x_z_score(self, neuron_index, path_to_save="Experiment_results/experiment_f/"):
         map_lin_out_path = "Experiment_results/experiment_b/lin1_out.npy"
         map_lin_out = np.load(map_lin_out_path, allow_pickle=True).item()
         mean_path = "Experiment_results/experiment_b/lin1_mean.npy"
@@ -901,7 +901,8 @@ class LatentSpacePlotter:
         plt.title(f"Neuron {neuron_index} Z-Score Across All X Values")
         plt.xlabel("X Value")
         plt.ylabel("Z-Score")
-        plt.show()
+        plt.savefig(path_to_save + f"neuron_{neuron_index}_z_score.png")
+        plt.clf()
 
     def experiment_g_prob_helper(self, map_lin_out, mean, std, neuron_ind, x_val):
         total_count = 32 * 32 * 40 * 6 * 3
@@ -946,9 +947,13 @@ class LatentSpacePlotter:
         print(f"P(x={x_val} | neuron_fires) = P(neuron_fires | x={x_val}) * P(x={x_val}) / P(neuron_fires given guassian curve) = {prob_neuron_fires_given_x_val} * {prob_x_val} / {0.158} = {prob_neuron_fires_given_x_val * prob_x_val / 0.158}")
     
     def experiment_h_helper(self, map_lin_out, mean, std, neuron_ind):
+        """
+        Calculates the groundtruth probability of (X = val | neuron fires)
+        as well as the calculated probability assuming that the neuron fires like a gaussian curve
+        """
         total_count = 32 * 32 * 40 * 6 * 3
         total_count_given_x = 32 * 40 * 6 * 3
-        map_neuron_fires_count = { key : 0 for key in range(32) } # key: x_val, value: number of times the neuron has fired
+        neuron_fires_count = 0 # key: neuron_id, value: number of times the neuron has fired
         map_neuron_fires_count_given_x = { key : 0 for key in range(32) } # key: x_val, value: number of times the neuron has fired
         map_x_val_given_neuron_fires = { key : 0 for key in range(32) } # key: x_val, value: number of times the neuron has fired
         for feat in map_lin_out.keys():
@@ -958,12 +963,18 @@ class LatentSpacePlotter:
             x_val  = list_feat[-2]
 
             if map_lin_out[feat][0][neuron_ind] > mean[0, neuron_ind] + 1 * std[0, neuron_ind]:
-                map_neuron_fires_count[x_val] += 1
+                neuron_fires_count += 1
                 map_neuron_fires_count_given_x[x_val] += 1
                 map_x_val_given_neuron_fires[x_val] += 1
-        return
+        prob_neuron_fires = neuron_fires_count / total_count
+        map_prob_neuron_fires_given_x = {key: value / total_count_given_x for key, value in map_neuron_fires_count_given_x.items()}
+        map_prob_x_val_given_neuron_fires = { key: value / neuron_fires_count for key, value in map_x_val_given_neuron_fires.items() }
+        print("prob_neuron_fires", prob_neuron_fires)
+        print("map_prob_neuron_fires_given_x", map_prob_neuron_fires_given_x)
+        print("map_prob_x_val_given_neuron_fires", map_prob_x_val_given_neuron_fires)
+        return prob_neuron_fires, map_prob_neuron_fires_given_x, map_prob_x_val_given_neuron_fires
 
-    def experiment_h(self, neuron_ind):
+    def experiment_h(self, neuron_ind, path_to_save="Experiment_results/experiment_h/"):
         """
         obtain the groundtruth probability of (X = val | neuron fires)
         as well as the calculated probability assuming that the neuron fires like a gaussain curve
@@ -977,11 +988,34 @@ class LatentSpacePlotter:
         std = np.load(std_path)
         prob_x_val = 1 / 32
         # same logic as experiment g helper but use a map for all x values
-        map_gc_probabilities, map_calculated_probabilities = self.experiment_h_helper(map_lin_out, mean, std, neuron_ind)
+        prob_neuron_fires, map_prob_neuron_fires_given_x, map_prob_x_val_given_neuron_fires = self.experiment_h_helper(map_lin_out, mean, std, neuron_ind)
+        prob_neuron_fires_gaussian = 0.158
+        map_prob_x_val_given_neuron_fires_gaussian = { key : map_prob_neuron_fires_given_x[key] * prob_x_val / prob_neuron_fires_gaussian for key in range(32) }
+        print("map_prob_x_val_given_neuron_fires_gaussian", map_prob_x_val_given_neuron_fires_gaussian)
         # plot the differences in the probabilities for each X value
-
-
+        map_prob_x_val_given_neuron_fires = {key: map_prob_x_val_given_neuron_fires[key] for key in sorted(map_prob_x_val_given_neuron_fires.keys())}
+        map_prob_x_val_given_neuron_fires_gaussian = {key: map_prob_x_val_given_neuron_fires_gaussian[key] for key in sorted(map_prob_x_val_given_neuron_fires_gaussian.keys())}
+        plt.plot(range(32), map_prob_x_val_given_neuron_fires.values(), label="groundtruth")
+        plt.plot(range(32), map_prob_x_val_given_neuron_fires_gaussian.values(), label="gaussian")
+        plt.title(f"Neuron {neuron_ind} Probability of X Value Given that the Neuron Fires")
+        plt.xlabel("X Value")
+        plt.ylabel("Probability")
+        plt.legend()
+        # plt.show()
+        plt.savefig(path_to_save + f"neuron_{neuron_ind}.png")
+        plt.clf()
         return 
+    
+    def experiment_i_bayesian_all_neurons(self):
+        for neuron_ind in range(256):
+            print(neuron_ind)
+            self.experiment_h(neuron_ind, path_to_save="Experiment_results/experiment_i/")
+
+    def experiment_j_z_score_all_neurons(self):
+        for neuron_ind in range(256):
+            print(neuron_ind)
+            self.experiment_f_neuron_idx_fired_for_all_x_z_score(neuron_ind, path_to_save="Experiment_results/experiment_j/")
+
     def main_experiment(self):
 
         list_of_idx = []
@@ -1014,6 +1048,8 @@ class LatentSpacePlotter:
                 "(Experiment g): Given a neuron number, and an X value, calculate the probability that the neuron fires on average, the probability that the neuron fires given that X value, \n" + \
                 "and the probability that x is that value given that the neuron fires \n" + \
                 "(Experiment h): Repeat experiment g for all X values of a given neuron and plot the probability that x is that value given that the neuron fires \n" + \
+                "(Experiment i): Repeat experiment h for all neurons and save the plots \n" + \
+                "(Experiment j): Repeat experiment e for all neurons and save the plots \n" + \
                 "Experiment Number (ENTER): "
 
             automatic_choice = input(
@@ -1186,6 +1222,12 @@ class LatentSpacePlotter:
                 except ValueError:
                     print("Invalid input. Please enter a number in between 0 and 256.")
                 break
+            elif automatic_choice == 'i':
+                running_experiment = 'i'
+                break
+            elif automatic_choice == 'j':
+                running_experiment = 'j'
+                break
 
             latent_behavior = self.ask_user_input()
             list_latent.append(latent_behavior)
@@ -1265,4 +1307,11 @@ class LatentSpacePlotter:
             print("Investigating neuron behaviors for neuron index =", neuron_idx)
             print("Calculating Bayesian Probabilities")
             self.experiment_h(neuron_idx)
-        
+        elif running_experiment == 'i':
+            print("Investigating neuron behaviors for all neurons")
+            print("Calculating Bayesian Probabilities and saving plots")
+            self.experiment_i_bayesian_all_neurons()
+        elif running_experiment == 'j':
+            print("Investigating neuron behaviors for all neurons")
+            print("Calculating z-score and saving plots")
+            self.experiment_j_z_score_all_neurons()
