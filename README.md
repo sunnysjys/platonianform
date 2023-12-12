@@ -35,10 +35,13 @@ This codebase accompanies the VAE Disentanglement Study, focusing on exploring t
 
 ## Usage
 1. Training the Model
-   `python3 disentangling-vae-master/main.py VAE_dsprites -d dsprites`
+   ```bash
+   python3 disentangling-vae-master/main.py VAE_dsprites -d dsprites
 3. Running Experiments
-   `python3 disentangling-vae-master/main.py VAE_dsprites --is-eval-only --is-metrics`
+   ```bash
+   python3 disentangling-vae-master/main.py VAE_dsprites --is-eval-only --is-metrics
 5. Testing and Evaluation
-   `python3 disentangling-vae-master/main.py VAE_dsprites --is-eval-only`
+   ```bash
+   python3 disentangling-vae-master/main.py VAE_dsprites --is-eval-only
 
    
