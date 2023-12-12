@@ -43,5 +43,3 @@ This codebase accompanies the VAE Disentanglement Study, focusing on exploring t
 5. Testing and Evaluation
    ```bash
    python3 disentangling-vae-master/main.py VAE_dsprites --is-eval-only
-
-   
