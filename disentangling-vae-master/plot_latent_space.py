@@ -773,7 +773,7 @@ class LatentSpacePlotter:
                             "Original Reconstructed Image", "Manipulated Image"], title=f"Original Latent: {first_shape_list_latent[idx][1]}, Intended Manipulated Latent: {second_shape_list_latent[idx][1]}")
             elif experiment_number == 7:
                 self.imshow([original_output_image, manipulated_image], [
-                    "Original Reconstructed Image", "Manipulated Image"], title=f"Original Latent: {first_shape_list_latent[idx]}, Intended Manipulated Latent: {second_shape_list_latent[idx]}", save_path=f"../Experimental_Results/experiment_seven/original_{str(first_shape_list_latent[idx])}_manipulated_{str(second_shape_list_latent[idx])}.png")
+                    "Original Reconstructed Image", "Manipulated Image"], title=f"Original Latent: {first_shape_list_latent[idx]}, Intended Manipulated Latent: {second_shape_list_latent[idx]}", save_path=f"/Users/jackyuan/Desktop/CS 236/cs236_code/platonianform/Experimental_Results/betaB_dsprites/experiment_seven/original_{str(first_shape_list_latent[idx])}_manipulated_{str(second_shape_list_latent[idx])}.png")
 
         random_second_shape_idx = random.sample(
             range(0, len(second_shape_list_of_idx)), N//2)
@@ -814,7 +814,7 @@ class LatentSpacePlotter:
                             "Original Reconstructed Image", "Manipulated Image"], title=f"Original Shape = {first_shape_list_latent[idx][1]}, Intended Manipulated Shape = {second_shape_list_latent[idx][1]}")
             elif experiment_number == 7:
                 self.imshow([original_output_image, manipulated_image], [
-                    "Original Reconstructed Image", "Manipulated Image"], title=f"Original Latent: {first_shape_list_latent[idx]}, Intended Manipulated Latent: {second_shape_list_latent[idx]}", save_path=f"../Experimental_Results/experiment_seven/original_{str(first_shape_list_latent[idx])}_manipulated_{str(second_shape_list_latent[idx])}.png")
+                    "Original Reconstructed Image", "Manipulated Image"], title=f"Original Latent: {first_shape_list_latent[idx]}, Intended Manipulated Latent: {second_shape_list_latent[idx]}", save_path=f"/Users/jackyuan/Desktop/CS 236/cs236_code/platonianform/Experimental_Results/betaB_dsprites/experiment_seven/original_{str(first_shape_list_latent[idx])}_manipulated_{str(second_shape_list_latent[idx])}.png")
 
     def main_experiment(self):
 
