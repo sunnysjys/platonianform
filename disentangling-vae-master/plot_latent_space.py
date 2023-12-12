@@ -313,7 +313,7 @@ class LatentSpacePlotter:
         # Plotting the heatmap
         plt.colorbar()
         plt.title(f"Heatmap for Neuron {neuron_id}, with shape 2, size 3, rotation 0")
-        plt.savefig(f"../Experiment_results/experiment_a/shape_2/{neuron_id}_shape_2_size_3_rotation_0_heatmap.png")
+        plt.savefig(f"Experiment_results_betaB/experiment_a/shape_2/{neuron_id}_shape_2_size_3_rotation_0_heatmap.png")
         plt.clf()
 
     def experiment_a_plot_linear(self, map_lin1_out):
@@ -763,14 +763,14 @@ class LatentSpacePlotter:
         np.save("Experiment_results/experiment_b/lin1_mean.npy", mean)
         np.save("Experiment_results/experiment_b/lin1_std.npy", std)
 
-    def experiment_c_neuron_firing_map_helper(self, map_lin_out, mean, std, x_val):
+    def experiment_c_neuron_firing_map_helper(self, map_lin_out, mean, std, x_vals):
         total_count =0
         map_fired_count = { key : 0 for key in range(256) } # key: neuron id, value: number of times it has fired
         for feat in map_lin_out.keys():
             # key is a string of the latent behavior
             # convert to a list of floats
             list_feat = list(map(float, feat[1:-1].split(',')))
-            if list_feat[-2] == x_val:
+            if list_feat[-2] in x_vals:
                 total_count += 1
                 for neuron_id, output in enumerate(map_lin_out[feat][0]):
                     if output > mean[0, neuron_id] + 1 * std[0, neuron_id]:
@@ -784,20 +784,20 @@ class LatentSpacePlotter:
             print(f"Neuron {sorted_map_fired_count[i][0]} has fired {sorted_map_fired_count[i][1]} times, which is {sorted_map_fired_count[i][1] / total_count * 100}% of the time")
         return sorted_map_fired_count
     
-    def experiment_c_x_val_neuron_fired(self, x_val):
+    def experiment_c_x_val_neuron_fired(self, x_vals, path_prefix):
         """
         This function loads the presaved linear layer outputs, mean, and std,
         find the top 10 neurons that have fired and the percentage they have fired
         across all possible combinations of features
         :param x_val : a value in between 0 and 31 that specifies the x position
         """
-        map_lin_out_path = "Experiment_results/experiment_b/lin1_out.npy"
+        map_lin_out_path = path_prefix + "/experiment_b/lin1_out.npy"
         map_lin_out = np.load(map_lin_out_path, allow_pickle=True).item()
-        mean_path = "Experiment_results/experiment_b/lin1_mean.npy"
+        mean_path = path_prefix + "/experiment_b/lin1_mean.npy"
         mean = np.load(mean_path)
-        std_path = "Experiment_results/experiment_b/lin1_std.npy"
+        std_path = path_prefix + "/experiment_b/lin1_std.npy"
         std = np.load(std_path)
-        return self.experiment_c_neuron_firing_map_helper(map_lin_out, mean, std, x_val)
+        return self.experiment_c_neuron_firing_map_helper(map_lin_out, mean, std, x_vals)
     
     def experiment_d_neuron_idx_helper(self, map_lin_out, mean, std, neuron_index):
         """
@@ -818,50 +818,56 @@ class LatentSpacePlotter:
         map_fired_percentage_ind = { key : value / total_count * 100 for key, value in map_fired_count_ind.items() }
         return map_fired_percentage_ind
 
-    def experiment_d_neuron_idx_fired_for_all_x(self, neuron_index):
+    def experiment_d_neuron_idx_fired_for_all_x(self, neuron_idxs, path_prefix):
         """
         This function runs experiment_c_x_val_neuron_fired for all x values and graphs the indexed neuron's
         firing pattern across all x values
         :param neuron_index : the index of the neuron to graph
         """
-        map_lin_out_path = "Experiment_results/experiment_b/lin1_out.npy"
+        map_lin_out_path = path_prefix + "/experiment_b/lin1_out.npy"
         map_lin_out = np.load(map_lin_out_path, allow_pickle=True).item()
-        mean_path = "Experiment_results/experiment_b/lin1_mean.npy"
+        mean_path = path_prefix + "/experiment_b/lin1_mean.npy"
         mean = np.load(mean_path)
-        std_path = "Experiment_results/experiment_b/lin1_std.npy"
+        std_path = path_prefix + "/experiment_b/lin1_std.npy"
         std = np.load(std_path)
+        for neuron_index in neuron_idxs:
+            map_fired_percentage = self.experiment_d_neuron_idx_helper(map_lin_out, mean, std, neuron_index)
+            print("map_fired_percentage_ind", map_fired_percentage)
+            # put the map_fired_percentage_ind.values() in order of x_val
+            map_fired_percentage = {key: map_fired_percentage[key] for key in sorted(map_fired_percentage.keys())}
+            plt.plot(range(32), map_fired_percentage.values())
+            plt.title(f"Neuron {neuron_index} Firing Pattern Across All X Values")
+            plt.xlabel("X Value")
+            plt.ylabel("Firing Percentage")
+            plt.savefig(path_prefix + f"/experiment_d/neuron_{neuron_index}.png")
+            plt.clf()
 
-        map_fired_percentage = self.experiment_d_neuron_idx_helper(map_lin_out, mean, std, neuron_index)
-        print("map_fired_percentage_ind", map_fired_percentage)
-        # put the map_fired_percentage_ind.values() in order of x_val
-        map_fired_percentage = {key: map_fired_percentage[key] for key in sorted(map_fired_percentage.keys())}
-        plt.plot(range(32), map_fired_percentage.values())
-        plt.title(f"Neuron {neuron_index} Firing Pattern Across All X Values")
-        plt.xlabel("X Value")
-        plt.ylabel("Firing Percentage")
-        plt.show()
-
-    def experiment_e_neuron_fired_z_score(self, x_val):
+    def experiment_e_neuron_fired_z_score(self, list_x_val, path_prefix):
         """
-        This function repeats the purpose of experiment c, where for a given x_val, it finds the neurons that fired
+        This function repeats the purpose of experiment c, where for all given x_vals, it finds the neurons that fired
         and calculates the z-score of its output value 
         """
-        map_lin_out_path = "Experiment_results/experiment_b/lin1_out.npy"
+        map_lin_out_path = path_prefix + "/experiment_b/lin1_out.npy"
         map_lin_out = np.load(map_lin_out_path, allow_pickle=True).item()
-        mean_path = "Experiment_results/experiment_b/lin1_mean.npy"
+        mean_path = path_prefix + "/experiment_b/lin1_mean.npy"
         mean = np.load(mean_path)
-        std_path = "Experiment_results/experiment_b/lin1_std.npy"
+        std_path = path_prefix + "/experiment_b/lin1_std.npy"
         std = np.load(std_path)
+
         map_fired_z_score = { key : 0 for key in range(256) } # key: neuron id, value: number of times it has fired
         for feat in map_lin_out.keys():
             # key is a string of the latent behavior
             # convert to a list of floats
             list_feat = list(map(float, feat[1:-1].split(',')))
-            if list_feat[-2] == x_val:
+            if list_feat[-2] in list_x_val:
                 for neuron_id, output in enumerate(map_lin_out[feat][0]):
-                    map_fired_z_score[neuron_id] += (output - mean[0, neuron_id]) / std[0, neuron_id]
+                    # avoid division by 0
+                    if std[0, neuron_id] == 0:
+                        continue
+                    else:
+                        map_fired_z_score[neuron_id] += (output - mean[0, neuron_id]) / std[0, neuron_id]
         # calculate mean z_score
-        map_fired_z_score = {key: value / (32 * 40 * 6 * 3) for key, value in map_fired_z_score.items()}
+        map_fired_z_score = {key: value / (len(list_x_val) * 32 * 40 * 6 * 3) for key, value in map_fired_z_score.items()}
         # sort the map by z_score
         sorted_map_fired_z_score = sorted(map_fired_z_score.items(), key=lambda x: x[1], reverse=True)
         print("sorted_map_fired_z_score", sorted_map_fired_z_score)
@@ -887,12 +893,12 @@ class LatentSpacePlotter:
         map_fired_z_score_ind = { key : value / (32 * 40 * 6 * 3) for key, value in map_fired_z_score_ind.items() }
         return map_fired_z_score_ind
 
-    def experiment_f_neuron_idx_fired_for_all_x_z_score(self, neuron_index, path_to_save="Experiment_results/experiment_f/"):
-        map_lin_out_path = "Experiment_results/experiment_b/lin1_out.npy"
+    def experiment_f_neuron_idx_fired_for_all_x_z_score(self, neuron_index, path_prefix, path_to_save="Experiment_results/experiment_f/"):
+        map_lin_out_path = path_prefix + "experiment_b/lin1_out.npy"
         map_lin_out = np.load(map_lin_out_path, allow_pickle=True).item()
-        mean_path = "Experiment_results/experiment_b/lin1_mean.npy"
+        mean_path = path_prefix + "/experiment_b/lin1_mean.npy"
         mean = np.load(mean_path)
-        std_path = "Experiment_results/experiment_b/lin1_std.npy"
+        std_path = path_prefix + "/experiment_b/lin1_std.npy"
         std = np.load(std_path)
         map_neuron_z_score = self.experiment_f_neuron_idx_helper(map_lin_out, mean, std, neuron_index)
         # plot the z_score for each x_val
@@ -904,9 +910,9 @@ class LatentSpacePlotter:
         plt.savefig(path_to_save + f"neuron_{neuron_index}_z_score.png")
         plt.clf()
 
-    def experiment_g_prob_helper(self, map_lin_out, mean, std, neuron_ind, x_val):
+    def experiment_g_prob_helper(self, map_lin_out, mean, std, neuron_ind, x_vals):
         total_count = 32 * 32 * 40 * 6 * 3
-        total_count_given_x = 32 * 40 * 6 * 3
+        total_count_given_x = len(x_vals) * 32 * 40 * 6 * 3
         neuron_fires_count = 0
         neuron_fires_count_given_x = 0
         x_val_given_neuron_fires = 0
@@ -915,37 +921,38 @@ class LatentSpacePlotter:
             # key is a string of the latent behavior
             # convert to a list of floats
             list_feat = list(map(float, feat[1:-1].split(',')))
-            if list_feat[-2] == x_val:
+            if list_feat[-2] in x_vals:
                 if map_lin_out[feat][0][neuron_ind] > mean[0, neuron_ind] + 1 * std[0, neuron_ind]:
                     neuron_fires_count_given_x += 1
             if map_lin_out[feat][0][neuron_ind] > mean[0, neuron_ind] + 1 * std[0, neuron_ind]:
                 neuron_fires_count += 1
-                if list_feat[-2] == x_val:
+                if list_feat[-2] in x_vals:
                     x_val_given_neuron_fires += 1
         prob_neuron_fires = neuron_fires_count / total_count
         prob_neuron_fires_given_x_val = neuron_fires_count_given_x / total_count_given_x
         prob_x_val_given_neuron_fires = x_val_given_neuron_fires / neuron_fires_count
         return prob_neuron_fires, prob_neuron_fires_given_x_val, prob_x_val_given_neuron_fires
 
-    def experiment_g_neuron_idx_x_val_bayes(self, neuron_index, x_val):
+    def experiment_g_neuron_idx_x_val_bayes(self, neuron_idxs, x_vals, path_prefix):
         """
         This function calculates the probability that the neuron fires on average, the probability that the neuron fires given that X value,
         and the probability that x is that value given that the neuron fires
         """
-        map_lin_out_path = "Experiment_results/experiment_b/lin1_out.npy"
+        map_lin_out_path = path_prefix + "/experiment_b/lin1_out.npy"
         map_lin_out = np.load(map_lin_out_path, allow_pickle=True).item()
-        mean_path = "Experiment_results/experiment_b/lin1_mean.npy"
+        mean_path = path_prefix + "/experiment_b/lin1_mean.npy"
         mean = np.load(mean_path)
-        std_path = "Experiment_results/experiment_b/lin1_std.npy"
+        std_path = path_prefix + "/experiment_b/lin1_std.npy"
         std = np.load(std_path)
-        prob_x_val = 1 / 32
-        prob_neuron_fires, prob_neuron_fires_given_x_val, prob_x_val_given_neuron_fires = self.experiment_g_prob_helper(map_lin_out, mean, std, neuron_index, x_val)
+        prob_x_val = 5 / 32
+        for neuron_index in neuron_idxs:
+            prob_neuron_fires, prob_neuron_fires_given_x_val, prob_x_val_given_neuron_fires = self.experiment_g_prob_helper(map_lin_out, mean, std, neuron_index, x_vals)
 
-        print(f"Probability that neuron {neuron_index} fires on average: {prob_neuron_fires}")
-        print(f"Probability that neuron {neuron_index} fires given that x is {x_val}: {prob_neuron_fires_given_x_val}")
-        print(f"Probability that x is {x_val} given that neuron {neuron_index} fires: {prob_x_val_given_neuron_fires}")
-        print(f"P(x={x_val} | neuron_fires) = P(neuron_fires | x={x_val}) * P(x={x_val}) / P(neuron_fires given guassian curve) = {prob_neuron_fires_given_x_val} * {prob_x_val} / {0.158} = {prob_neuron_fires_given_x_val * prob_x_val / 0.158}")
-    
+            print(f"Probability that neuron {neuron_index} fires on average: {prob_neuron_fires}")
+            print(f"Probability that neuron {neuron_index} fires given that x is {x_vals}: {prob_neuron_fires_given_x_val}")
+            print(f"Probability that x is {x_vals} given that neuron {neuron_index} fires: {prob_x_val_given_neuron_fires}")
+            print(f"P(x={x_vals} | neuron_fires) = P(neuron_fires | x={x_vals}) * P(x={x_vals}) / P(neuron_fires given guassian curve) = {prob_neuron_fires_given_x_val} * {prob_x_val} / {0.158} = {prob_neuron_fires_given_x_val * prob_x_val / 0.158}")
+        
     def experiment_h_helper(self, map_lin_out, mean, std, neuron_ind):
         """
         Calculates the groundtruth probability of (X = val | neuron fires)
@@ -974,47 +981,84 @@ class LatentSpacePlotter:
         print("map_prob_x_val_given_neuron_fires", map_prob_x_val_given_neuron_fires)
         return prob_neuron_fires, map_prob_neuron_fires_given_x, map_prob_x_val_given_neuron_fires
 
-    def experiment_h(self, neuron_ind, path_to_save="Experiment_results/experiment_h/"):
+    def experiment_h(self, neuron_idxs, path_prefix, path_to_save="Experiment_results/experiment_h/"):
         """
         obtain the groundtruth probability of (X = val | neuron fires)
         as well as the calculated probability assuming that the neuron fires like a gaussain curve
         plot the differences in the probabilities for each X value
         """
-        map_lin_out_path = "Experiment_results/experiment_b/lin1_out.npy"
+        map_lin_out_path = path_prefix + "/experiment_b/lin1_out.npy"
         map_lin_out = np.load(map_lin_out_path, allow_pickle=True).item()
-        mean_path = "Experiment_results/experiment_b/lin1_mean.npy"
+        mean_path = path_prefix + "/experiment_b/lin1_mean.npy"
         mean = np.load(mean_path)
-        std_path = "Experiment_results/experiment_b/lin1_std.npy"
+        std_path = path_prefix + "/experiment_b/lin1_std.npy"
         std = np.load(std_path)
         prob_x_val = 1 / 32
-        # same logic as experiment g helper but use a map for all x values
-        prob_neuron_fires, map_prob_neuron_fires_given_x, map_prob_x_val_given_neuron_fires = self.experiment_h_helper(map_lin_out, mean, std, neuron_ind)
-        prob_neuron_fires_gaussian = 0.158
-        map_prob_x_val_given_neuron_fires_gaussian = { key : map_prob_neuron_fires_given_x[key] * prob_x_val / prob_neuron_fires_gaussian for key in range(32) }
-        print("map_prob_x_val_given_neuron_fires_gaussian", map_prob_x_val_given_neuron_fires_gaussian)
-        # plot the differences in the probabilities for each X value
-        map_prob_x_val_given_neuron_fires = {key: map_prob_x_val_given_neuron_fires[key] for key in sorted(map_prob_x_val_given_neuron_fires.keys())}
-        map_prob_x_val_given_neuron_fires_gaussian = {key: map_prob_x_val_given_neuron_fires_gaussian[key] for key in sorted(map_prob_x_val_given_neuron_fires_gaussian.keys())}
-        plt.plot(range(32), map_prob_x_val_given_neuron_fires.values(), label="groundtruth")
-        plt.plot(range(32), map_prob_x_val_given_neuron_fires_gaussian.values(), label="gaussian")
-        plt.title(f"Neuron {neuron_ind} Probability of X Value Given that the Neuron Fires")
-        plt.xlabel("X Value")
-        plt.ylabel("Probability")
-        plt.legend()
-        # plt.show()
-        plt.savefig(path_to_save + f"neuron_{neuron_ind}.png")
-        plt.clf()
-        return 
+        for neuron_ind in neuron_idxs:
+            # same logic as experiment g helper but use a map for all x values
+            prob_neuron_fires, map_prob_neuron_fires_given_x, map_prob_x_val_given_neuron_fires = self.experiment_h_helper(map_lin_out, mean, std, neuron_ind)
+            prob_neuron_fires_gaussian = 0.158
+            map_prob_x_val_given_neuron_fires_gaussian = { key : map_prob_neuron_fires_given_x[key] * prob_x_val / prob_neuron_fires_gaussian for key in range(32) }
+            print("map_prob_x_val_given_neuron_fires_gaussian", map_prob_x_val_given_neuron_fires_gaussian)
+            # plot the differences in the probabilities for each X value
+            map_prob_x_val_given_neuron_fires = {key: map_prob_x_val_given_neuron_fires[key] for key in sorted(map_prob_x_val_given_neuron_fires.keys())}
+            map_prob_x_val_given_neuron_fires_gaussian = {key: map_prob_x_val_given_neuron_fires_gaussian[key] for key in sorted(map_prob_x_val_given_neuron_fires_gaussian.keys())}
+            plt.plot(range(32), map_prob_x_val_given_neuron_fires.values(), label="groundtruth")
+            plt.plot(range(32), map_prob_x_val_given_neuron_fires_gaussian.values(), label="gaussian")
+            plt.title(f"Neuron {neuron_ind} Probability of X Value Given that the Neuron Fires")
+            plt.xlabel("X Value")
+            plt.ylabel("Probability")
+            plt.legend()
+            # plt.show()
+            plt.savefig(path_prefix + "/experiment_h/" + f"neuron_{neuron_ind}.png")
+            plt.clf()
     
-    def experiment_i_bayesian_all_neurons(self):
+    def experiment_i_bayesian_all_neurons(self, path_prefix):
         for neuron_ind in range(256):
             print(neuron_ind)
-            self.experiment_h(neuron_ind, path_to_save="Experiment_results/experiment_i/")
+            self.experiment_h(neuron_ind, path_to_save= path_prefix + "/experiment_i/")
 
-    def experiment_j_z_score_all_neurons(self):
+    def experiment_j_z_score_all_neurons(self, path_prefix):
         for neuron_ind in range(256):
             print(neuron_ind)
-            self.experiment_f_neuron_idx_fired_for_all_x_z_score(neuron_ind, path_to_save="Experiment_results/experiment_j/")
+            self.experiment_f_neuron_idx_fired_for_all_x_z_score(neuron_ind, path_to_save=path_prefix + "/experiment_j/")
+
+    def experiment_k_plot_output_value(self, x_vals, neuron_idxs, path_prefix):
+        sorted_map_fired_count = self.experiment_c_x_val_neuron_fired(x_vals, path_prefix)
+
+        # Select top and bottom 10 neurons
+        top_10_neurons = list(sorted_map_fired_count[i][0] for i in range(10))
+        bottom_10_neurons = list(sorted_map_fired_count[-i][0] for i in range(1, 11))
+
+        map_lin_out_path = path_prefix + "/experiment_b/lin1_out.npy"
+        map_lin_out = np.load(map_lin_out_path, allow_pickle=True).item()
+
+        # Initialize dictionary to store output values
+        map_neuron_out = {neuron: [] for neuron in top_10_neurons + bottom_10_neurons}
+
+        # Compute output values for each neuron across all feature combinations
+        for feat in map_lin_out.keys():
+            # key is a string of the latent behavior
+            # convert to a list of floats
+            list_feat = list(map(float, feat[1:-1].split(',')))
+            for neuron_ind in top_10_neurons + bottom_10_neurons:
+                if list_feat[-2] in x_vals:
+                    map_neuron_out[neuron_ind].append(map_lin_out[feat][0][neuron_ind])
+
+        # Plotting
+        for neuron_ind in top_10_neurons + bottom_10_neurons + neuron_idxs:
+            plt.plot(range(32 * 40 * 6 * 3), map_neuron_out[neuron_ind], label=f"neuron {neuron_ind}")
+            plt.title(f"Neuron {neuron_ind} Output Value When x={x_vals}")
+            plt.xlabel("All Features")
+            plt.ylabel("Output Value")
+
+            # Set y-axis limit to the maximum value for this neuron
+            plt.ylim([0, 4.5])
+
+            plt.legend()
+            plt.savefig(path_prefix + f"/experiment_k/neuron_{neuron_ind}_x_{x_vals}.png")
+            plt.clf()
+
 
     def main_experiment(self):
 
@@ -1029,6 +1073,23 @@ class LatentSpacePlotter:
         running_experiment = False
         pass_decoder = False
         while True:
+            prompt = " Enter the model number \n" + \
+                "(Model 1): VAE \n" + \
+                "(Model 2): Beta-VAE-H \n" + \
+                "(Model 3): Beta-VAE-B \n" + \
+                "Enter the model number (ENTER): "
+            model_number = input(prompt).strip()
+            if model_number == '1':
+                path_prefix = "Experiment_results"
+                break
+            elif model_number == '2':
+                path_prefix = "Experiment_results_beta"
+                break
+            elif model_number == '3':
+                path_prefix = "Experiment_results_betaB"
+                break
+                
+        while True:
             prompt = " Enter the experiment number, else enter N \n" + \
                 "(Experiment 1): Incremently increase the x from 0 to 31, while measuring the difference between the \n" +  \
                 "latent dimensions for each x when y = 0 v.s. y = 31 for the shape ellipse, rotation 0, and size 3?\n" + \
@@ -1041,15 +1102,17 @@ class LatentSpacePlotter:
                 "NEED TO MANUALLY CHANGE SHAPE FOLDER IN EXPERIMENT A PLOT HELPER \n" + \
                 "(Experiment b): Generate the first linear layer output for all combinations of features\n" + \
                 "(Experiment c): Given all possible latent behaviors, input an X value, and find the neurons that have fired for that X generalized to all combinations of features \n" + \
-                "(Experiment d): Given a neuron number, repeat experiment c for all X values and plot firing percentage\n" + \
-                "(Experiment e): Similar to experiment c, input an X value, and find the neurons that fired for that X, but instead of counting the number of times it fired, \n" + \
+                "(Experiment d): Given a list of neuron number, repeat experiment c for all X values and plot firing percentage\n" + \
+                "(Experiment e): Similar to experiment c, input a range of X values, and find the neurons that fired for that X, but instead of counting the number of times it fired, \n" + \
                 "calculate the z-score of the number of times it fired, and plot the z-score for all neurons \n" + \
                 "(Experiment f): Given a neuron number, repeat experiment e for all X values and plot average z_score\n" + \
-                "(Experiment g): Given a neuron number, and an X value, calculate the probability that the neuron fires on average, the probability that the neuron fires given that X value, \n" + \
+                "(Experiment g): Given a neuron number, and a list of X values, calculate the probability that the neuron fires on average, the probability that the neuron fires given that X value, \n" + \
                 "and the probability that x is that value given that the neuron fires \n" + \
                 "(Experiment h): Repeat experiment g for all X values of a given neuron and plot the probability that x is that value given that the neuron fires \n" + \
                 "(Experiment i): Repeat experiment h for all neurons and save the plots \n" + \
                 "(Experiment j): Repeat experiment e for all neurons and save the plots \n" + \
+                "(Experiment k): Repeat experiment c, and instead of finding the percentage of times that a neuron has fired, \n" + \
+                "plot the output value of the neuron for a given X value across all combinations of features \n" + \
                 "Experiment Number (ENTER): "
 
             automatic_choice = input(
@@ -1164,30 +1227,31 @@ class LatentSpacePlotter:
                 break
             elif automatic_choice == 'c':
                 running_experiment = 'c'
-                prompt = "Enter the X value you want to hold constant \n" + \
+                prompt = "Enter the X values you want to hold constant. Please enter them separeted by a comma \n" + \
                     "(ENTER): "
                 try:
-                    x_value = int(input(prompt).strip())
+                    x_values = list(map(int, input(prompt).strip().split(',')))
                 except ValueError:
                     print("Invalid input. Please enter a number.")
                 break 
             elif automatic_choice == 'd':
                 running_experiment = 'd'
-                prompt = "Enter the neuron index you want to investigate \n" + \
+                prompt = "Enter the neuron indices you want to investigate and separate them in commas \n" + \
                     "(ENTER): "
                 try:
-                    neuron_idx = int(input(prompt).strip())
+                    neuron_idxs = input(prompt).strip()
+                    neuron_idxs = list(map(int, neuron_idxs.split(',')))
                 except ValueError:
                     print("Invalid input. Please enter a number in between 0 and 256.")
                 break
             elif automatic_choice == 'e':
                 running_experiment = 'e'
-                prompt = "Enter the X value you want to hold constant \n" + \
-                    "(ENTER): "
+                prompt = "What values of X do you want to hold it to be constant at? Please enter them separated by a comma \n (ENTER): "
                 try:
-                    x_value = int(input(prompt).strip())
+                    x_values = input(prompt).strip()
+                    x_values = list(map(int, x_values.split(',')))
                 except ValueError:
-                    print("Invalid input. Please enter a number.")
+                    print("Invalid input. Please enter numbers separated by a comma.")
                 break
             elif automatic_choice == 'f':
                 running_experiment = 'f'
@@ -1200,33 +1264,54 @@ class LatentSpacePlotter:
                 break
             elif automatic_choice == 'g':
                 running_experiment = 'g'
-                prompt = "Enter the X value you want to hold constant \n" + \
+                prompt = "What values of X do you want to hold it to be constant at? Please enter them separated by a comma \n (ENTER): "
+                try:
+                    x_values = input(prompt).strip()
+                    x_values = list(map(int, x_values.split(',')))
+                    print("x_values", x_values)
+                except ValueError:
+                    print("Invalid input. Please enter numbers separated by a comma.")
+                prompt = "Enter the neuron indices you want to investigate. Please enter them separated by a comma \n" + \
                     "(ENTER): "
                 try:
-                    x_value = int(input(prompt).strip())
+                    neuron_idxs = input(prompt).strip()
+                    neuron_idxs = list(map(int, neuron_idxs.split(',')))
                 except ValueError:
-                    print("Invalid input. Please enter a number.")
-                prompt = "Enter the neuron index you want to investigate \n" + \
-                    "(ENTER): "
-                try:
-                    neuron_idx = int(input(prompt).strip())
-                except ValueError:
-                    print("Invalid input. Please enter a number in between 0 and 256.")
+                    print("Invalid input. Please enter a list of number in between 0 and 256 and separated by a comma.")
                 break
             elif automatic_choice == 'h':
                 running_experiment = 'h'
-                prompt = "Enter the neuron index you want to investigate \n" + \
+                prompt = "Enter the neuron indices you want to investigate, separate by comma \n" + \
                     "(ENTER): "
                 try:
-                    neuron_idx = int(input(prompt).strip())
+                    neuron_idxs = input(prompt).strip()
+                    neuron_idxs = list(map(int, neuron_idxs.split(',')))
                 except ValueError:
-                    print("Invalid input. Please enter a number in between 0 and 256.")
+                    print("Invalid input. Please enter numbers in between 0 and 256.")
                 break
             elif automatic_choice == 'i':
                 running_experiment = 'i'
                 break
             elif automatic_choice == 'j':
                 running_experiment = 'j'
+                break
+            elif automatic_choice == 'k':
+                running_experiment = 'k'
+                prompt = "Enter the X values you want to hold constant, separated by a comma \n" + \
+                    "(ENTER): "
+                try:
+                    x_value = input(prompt).strip()
+                    x_value = list(map(int, x_value.split(',')))
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
+                prompt = "Enter the neuron indices that you want to include in the plots, separated by a comma\n"   + \
+                    "(ENTER): "
+                try:
+                    neuron_idxs = input(prompt).strip()
+                    neuron_idxs = list(map(int, neuron_idxs.split(',')))
+                except ValueError:
+                    print("Invalid input. Please enter numbers in between 0 and 256.")
+                
                 break
 
             latent_behavior = self.ask_user_input()
@@ -1285,33 +1370,37 @@ class LatentSpacePlotter:
         elif running_experiment == 'b':
             self.experiment_b_save_linear_layer_outputs(map_lin1_out)
         elif running_experiment == 'c':
-            print("Investigating neuron behaviors for X =", x_value)
-            self.experiment_c_x_val_neuron_fired(x_value)
+            print("Investigating neuron behaviors for X =", x_values)
+            self.experiment_c_x_val_neuron_fired(x_values, path_prefix)
         elif running_experiment == 'd':
-            print("Investigating neuron behaviors for neuron index =", neuron_idx)
+            print("Investigating neuron behaviors for neuron index =", neuron_idxs)
             print("Across all X values")
-            self.experiment_d_neuron_idx_fired_for_all_x(neuron_idx)
+            self.experiment_d_neuron_idx_fired_for_all_x(neuron_idxs, path_prefix)
         elif running_experiment == 'e':
-            print("Investigating neuron behaviors for X =", x_value)
+            print("Investigating neuron behaviors for X =", x_values)
             print("Using z-score")
-            self.experiment_e_neuron_fired_z_score(x_value)
+            self.experiment_e_neuron_fired_z_score(x_values, path_prefix)
         elif running_experiment == 'f':
             print("Investigating neuron behaviors for neuron index =", neuron_idx)
             print("Using z-score")
-            self.experiment_f_neuron_idx_fired_for_all_x_z_score(neuron_idx)
+            self.experiment_f_neuron_idx_fired_for_all_x_z_score(neuron_idx, path_prefix)
         elif running_experiment == 'g':
-            print("Investigating neuron behaviors for neuron index =", neuron_idx, "and X =", x_value)
+            print("Investigating neuron behaviors for neuron index =", neuron_idxs, "and X =", x_values)
             print("Calculating Bayesian Probabilities")
-            self.experiment_g_neuron_idx_x_val_bayes(neuron_idx, x_value)
+            self.experiment_g_neuron_idx_x_val_bayes(neuron_idxs, x_values, path_prefix)
         elif running_experiment == 'h':
-            print("Investigating neuron behaviors for neuron index =", neuron_idx)
+            print("Investigating neuron behaviors for neuron index =", neuron_idxs)
             print("Calculating Bayesian Probabilities")
-            self.experiment_h(neuron_idx)
+            self.experiment_h(neuron_idxs, path_prefix)
         elif running_experiment == 'i':
             print("Investigating neuron behaviors for all neurons")
             print("Calculating Bayesian Probabilities and saving plots")
-            self.experiment_i_bayesian_all_neurons()
+            self.experiment_i_bayesian_all_neurons(path_prefix)
         elif running_experiment == 'j':
             print("Investigating neuron behaviors for all neurons")
             print("Calculating z-score and saving plots")
-            self.experiment_j_z_score_all_neurons()
+            self.experiment_j_z_score_all_neurons(path_prefix)
+        elif running_experiment == 'k':
+            print("Investigating neuron behaviors for X =", x_value)
+            print("Plotting output value of neuron")
+            self.experiment_k_plot_output_value(x_value, neuron_idxs, path_prefix)

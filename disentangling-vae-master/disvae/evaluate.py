@@ -133,6 +133,8 @@ class Evaluator:
                 type(dataloader.__dict__["dataset"]).__name__))
 
         self.logger.info("Computing the empirical distribution q(z|x).")
+        samples_zCx, params_zCx = self._compute_q_zCx(dataloader)
+        len_dataset, latent_dim = samples_zCx.shape
         print("dataloader", dataloader)
         print('len(dataloader.dataset): ', len(dataloader.dataset))
 
@@ -148,21 +150,21 @@ class Evaluator:
         first_photo = dataloader.dataset[first_index]
         second_photo = dataloader.dataset[second_index]
 
-        print('top left object')
-        samples_zCx, params_zCx, first_decoder_output = self._compute_q_zCx_single(
-            dataloader, first_index)
-        imshow(first_photo[0])
+        # print('top left object')
+        # samples_zCx, params_zCx, first_decoder_output = self._compute_q_zCx_single(
+        #     dataloader, first_index)
+        # imshow(first_photo[0])
 
-        imshow(first_decoder_output[0])
+        # imshow(first_decoder_output[0])
 
-        print('bottom right object')
-        samples_zCx, params_zCx, second_decoder_output = self._compute_q_zCx_single(
-            dataloader, second_index)
-        imshow(second_photo[0])
-        imshow(second_decoder_output[0])
+        # print('bottom right object')
+        # samples_zCx, params_zCx, second_decoder_output = self._compute_q_zCx_single(
+        #     dataloader, second_index)
+        # imshow(second_photo[0])
+        # imshow(second_decoder_output[0])
 
         # samples_zCx, params_zCx = self._compute_q_zCx(dataloader)
-        len_dataset, latent_dim = samples_zCx.shape
+        # len_dataset, latent_dim = samples_zCx.shape
 
         self.logger.info("Estimating the marginal entropy.")
         # marginal entropy H(z_j)

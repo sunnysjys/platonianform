@@ -423,6 +423,9 @@ def _reconstruction_loss(data, recon_data, distribution="bernoulli", storer=None
         Per image cross entropy (i.e. normalized per batch but not pixel and
         channel)
     """
+
+    # changed below from recon_data to recon_data[0], which has shape 256, 1, 64, 64 
+    recon_data = recon_data[0]   
     batch_size, n_chan, height, width = recon_data.size()
     is_colored = n_chan == 3
 
